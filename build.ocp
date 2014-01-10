@@ -1,0 +1,16 @@
+begin library "ocplib-ocamlres"
+      files = [
+      	    "oCamlRes.ml"
+      	    "oCamlResOutput.ml"
+      ]
+      requires = [ "str" "unix" ]
+      asmcomp = [ "-g" ]
+end
+
+begin program "ocp-ocamlres"
+      files = [
+      	    "oCamlResMain.ml"
+      ]
+      requires = [ "ocplib-ocamlres" ]
+      asmcomp = [ "-g" ]
+end
