@@ -108,8 +108,57 @@ module Res = struct
     node list
   and node =
     | Dir of string * node list
-    | File of Path.name * string
+    | File of string * string
     | Error of string
+
+  module SM = Map.Make (String)
+  module SS = Set.Make (String)
+      
+  (** Merges two resources *)
+  let rec merge node1 node2 =
+    match node1, node2 with
+    | Dir (n1, l1), Dir (n2, l2) ->
+      if n1 <> n2 then
+        [ node1 ; node2 ]
+      else
+        [ Dir (n1, merge_roots l1 l2) ]
+    | (File (n, _) as f), (Dir (nd, _) as dir)
+    | (Dir (nd, _) as dir), (File (n, _) as f) ->
+      if n <> nd then
+        [ f ; dir ]
+      else
+        [ Error ("unmergeable versions of " ^ n) ]
+    | (File (n1, c1) as f1), (File (n2, c2) as f2) ->
+      if n1 <> n2 || c1 = c2 then
+        [ f1 ; f2 ]
+      else
+        [ Error ("unmergeable versions of " ^ n1) ]
+    | (Error _ as e), n | n, (Error _ as e) ->
+      [ e ; n ]
+  (** Merges two resource stores *)
+  and merge_roots rl rr =
+    let files = ref SM.empty in
+    let errors = ref SS.empty in
+    let do_one =
+      List.iter
+        (fun node ->
+           let to_add = match node with
+             | Dir (n, _) | File (n, _) as f ->
+               (try merge f (SM.find n !files) with Not_found -> [ f ])
+             | Error _ as e -> [ e ]
+           in 
+           List.iter
+             (function
+               | Error msg ->
+                 errors := SS.add msg !errors
+               | Dir (n, _) | File (n, _) as f ->
+                 files := SM.add n f !files)
+             to_add)
+    in
+    do_one rl ;
+    do_one rr ;
+    snd (List.split (SM.bindings !files))
+    @ List.map (fun msg -> Error msg) (SS.elements !errors )
 end
 
 (** Filters used to select the files and dirs to be scanned. *)
@@ -140,6 +189,7 @@ module PathFilter = struct
     fun path ->
       match path with
       | (_, Some (_, Some ext)) -> SS.mem ext exts
+      | (_, None) -> true
       | _ -> false
 end
 
@@ -160,36 +210,56 @@ module ResFilter = struct
     fun res -> List.fold_left (fun r f -> r && (f res)) true fs
   let any_of (fs : t list) : t =
     fun res -> List.fold_left (fun r f -> r || (f res)) false fs
+  let empty_dir : t = function Res.Dir (_, []) -> true | _ -> false
 end
 
 (** Import the files from a base directory as a resource store root. *)
 let scan ?(prefilter = PathFilter.any) ?(postfilter = ResFilter.any) base =
   let open Res in
-  let rec scan name path =
-    try
-      if not (Sys.file_exists path) then
-        Error (Printf.sprintf "no such file %S" path) 
-      else if Sys.is_directory path then
-        scan_dir name path
-      else
-        scan_file name path
-    with exn ->
-      Error (Printf.sprintf "scanning file %S, %s" path (Printexc.to_string exn))
-  and scan_dir name path =
-    let files = Array.to_list (Sys.readdir path) in
-    let paths = List.map (fun n -> n, path ^ "/" ^ n) files in
-    Dir (name, List.map (fun (n, p) -> scan n p) paths)
-  and scan_file name path =
+  let rec scan path name pstr =
+    let res = try
+        if not (Sys.file_exists pstr) then
+          Some (Error (Printf.sprintf "no such file %S" pstr))
+        else if Sys.is_directory pstr then
+          if prefilter (name :: path, None) then
+            Some (scan_dir path name pstr)
+          else None
+        else if prefilter (name :: path, Some (Path.split_ext name)) then
+          Some (scan_file path name pstr)
+        else None
+      with exn ->
+        let msg =
+          Printf.sprintf "scanning file %S, %s" pstr (Printexc.to_string exn) in
+        Some (Error msg)
+    in
+    match res with
+    | Some r when postfilter r -> res
+    | _ -> None
+  and scan_dir path name pstr =
+    let files = Array.to_list (Sys.readdir pstr) in
+    let pstrs = List.map (fun n -> n, pstr ^ "/" ^ n) files in
+    let npath = name :: path in
+    let contents = List.map (fun (n, p) -> scan npath n p) pstrs in
+    let contents =
+      List.fold_left
+        (fun r opt -> match opt with None -> r | Some p -> p :: r)
+        [] contents
+    in
+    Dir (name, contents)
+  and scan_file path name pstr =
       let contents =
-        let chan = open_in_bin path in
+        let chan = open_in_bin pstr in
         let len = in_channel_length chan in
         let buffer = String.create len in
         really_input chan buffer 0 len ;
         close_in chan ;
         buffer
       in
-      File (Path.split_ext name, contents)
+      File (name, contents)
   in
-  match scan "root" base with
-  | Dir (_, l) -> l
-  | single -> [ single ]
+  match scan [] "root" base with
+  | Some (Dir (_, l)) -> l
+  | Some (File (_, ctns)) -> [ File (base, ctns) ]
+  | Some (Error _ as err) -> [ err ]
+  | None -> []
+  

@@ -3,7 +3,7 @@ begin library "ocplib-ocamlres"
       	    "oCamlRes.ml"
       	    "oCamlResOutput.ml"
       ]
-      requires = [ "str" "unix" ]
+      requires = [ "str" "unix" "dynlink" ]
       asmcomp = [ "-g" ]
 end
 

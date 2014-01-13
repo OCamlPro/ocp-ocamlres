@@ -18,8 +18,63 @@
 (** Parse the preload arguments, select the output backend and pass
     the control to it. *)
 let main () =
-  let module Output = (val (OCamlResOutput.find Sys.argv.(1))) in
-  let root = OCamlRes.scan Sys.argv.(2) in
+  let files = ref [] in
+  let exts = ref [] in
+  let skip_empty_dirs = ref true in
+  let output_module = ref (module OCamlResOutput.Res : OCamlResOutput.Output) in
+  let all_args = ref []
+  and main_args = ref [] in
+  let set_output_module name =
+    output_module := OCamlResOutput.find name ;
+    let module Output_Module = (val !output_module) in
+    all_args := Arg.align (!main_args @ Output_Module.options)
+  in
+  let preload_module name =
+    Dynlink.loadfile name
+  in
+  let print_format_list () =
+    List.iter
+      (fun (name, m) ->
+         let module M = (val m : OCamlResOutput.Output) in
+         Printf.printf "%s: %s\n" name M.info
+      )
+      !OCamlResOutput.output_modules
+  in
+  main_args := [
+    "-format", Arg.String set_output_module,
+    "\"format\" define the output format (defaults to \"static\")" ;
+    "-list", Arg.Unit print_format_list,
+    " print the list of available formats" ;
+    "-plug", Arg.String preload_module,
+    "\"plugin.cmxs\" load a plug-in" ;
+    "-ext", Arg.String (fun e -> exts := e :: !exts),
+    "\"ext\" only scan files ending with \".ext\" (can be called more than once)" ;
+    "-keep-empty-dirs", Arg.Clear skip_empty_dirs,
+    " keep empty dirs in scanned files"
+  ] ;
+  set_output_module "static" ;
+  Arg.parse_dynamic
+    all_args
+    (fun p -> files := p :: !files)
+    ("Usage: " ^ Sys.argv.(0) ^ " [ -format <format> ] [ options ] files...") ;
+  let prefilter =
+    if !exts = [] then
+      OCamlRes.PathFilter.any
+    else
+      OCamlRes.PathFilter.has_extension !exts
+  in
+  let postfilter =
+    if !skip_empty_dirs then
+      OCamlRes.ResFilter.(exclude empty_dir)
+    else
+      OCamlRes.ResFilter.any
+  in
+  let module Output = (val !output_module) in
+  let root =
+    List.fold_left
+      (fun r d -> OCamlRes.(Res.merge_roots r (scan ~prefilter ~postfilter d)))
+      [] !files
+  in
   Output.output stdout root
 
 let _ = main ()

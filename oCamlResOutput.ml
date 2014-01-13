@@ -20,7 +20,9 @@ open Printf
 
 (** The type of output plug-ins *)
 module type Output = sig
+  val info : string
   val output : out_channel -> OCamlRes.Res.root -> unit
+  val options : (Arg.key * Arg.spec * Arg.doc) list
 end
 
 (** A global registry for output plug-ins *)
@@ -151,7 +153,8 @@ module Static = struct
         fprintf fp "%smodule %s = struct\n%!" lvl (esc_dir name) ;
         List.iter (output (lvl ^ "  ")) nodes ;
         fprintf fp "%send\n%!" lvl
-      | File ((name, _), data) ->
+      | File (name, data) ->
+        let name = fst (OCamlRes.Path.split_ext name) in
         fprintf fp "%slet %s =\n%!" lvl (esc_name name) ;
         let lvl = lvl ^ " " in
         let rec loop = function
@@ -169,6 +172,9 @@ module Static = struct
     List.iter
       (fun node -> output "" node)
       root
+
+  let info = "produces static ocaml bindings (modules for dirs, values for files)"
+  let options = []
 end
   
 let _ = register "static" (module Static)
@@ -176,7 +182,7 @@ let _ = register "static" (module Static)
 (** Produces OCaml source contaiming a single [root] value which
     contains an OCamlRes tree to be used at runtime through the
     OCamlRes module. *)
-module OCamlRes = struct
+module Res = struct
   let output fp root =
     let rec output lvl node =
       match node with
@@ -186,13 +192,8 @@ module OCamlRes = struct
         fprintf fp "%sDir (%S, [\n%!" lvl name ;
         List.iter (output (lvl ^ "  ")) nodes ;
         fprintf fp "%s]) ;\n%!" lvl ;
-      | File ((name, ext), data) ->
-        let ext =
-          match ext with
-          | None -> "None"
-          | Some ext -> sprintf "Some %S" ext
-        in
-        fprintf fp "%sFile ((%S, %s),\n%!" lvl name ext ;
+      | File (name, data) ->
+        fprintf fp "%sFile (%S,\n%!" lvl name ;
         let lvl = lvl ^ "  " in
         let rec loop = function
           | [] -> ()
@@ -211,6 +212,42 @@ module OCamlRes = struct
       (fun node -> output "  " node)
       root ;
     fprintf fp "])\n%!"
+
+  let info = "produces the OCaml source representation of the OCamlRes tree"
+  let options = []
 end
 
-let _ = register "ocamlres" (module OCamlRes)
+let _ = register "ocamlres" (module Res)
+
+(** Reproduces the original scanned files (or creates new ones in case
+    of a forger resource store). *)
+module Files = struct
+  let base_output_dir = ref "."
+
+  let output fp root =
+    let rec output base node =
+      match node with
+      | Error msg ->
+        eprintf "Error: %s\n%!" msg
+      | Dir (name, nodes) ->
+        let dir = base ^ "/" ^ name in
+        Unix.handle_unix_error (Unix.mkdir dir) 0o750 ;
+        List.iter (output dir) nodes ;
+      | File (name, data) ->
+        let chan = open_out_bin (base ^ "/" ^ name) in
+        output_string chan data ;
+        close_out chan
+    in
+    if not (Sys.file_exists !base_output_dir) then
+      Unix.handle_unix_error (Unix.mkdir !base_output_dir) 0o750 ;
+    List.iter
+      (fun node -> output !base_output_dir node)
+      root
+
+  let info = "reproduces the original files"
+  let options = [
+    "-output-dir", Arg.Set_string base_output_dir,
+    " set the base output directory (defaults to \".\")"]
+end
+
+let _ = register "files" (module Files)
