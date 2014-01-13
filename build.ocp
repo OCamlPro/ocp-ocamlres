@@ -1,6 +1,7 @@
 begin library "ocplib-ocamlres"
       files = [
       	    "oCamlRes.ml"
+      	    "oCamlResSubFormats.ml"
       	    "oCamlResOutput.ml"
       ]
       requires = [ "str" "unix" "dynlink" ]

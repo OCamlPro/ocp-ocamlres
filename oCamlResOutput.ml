@@ -119,6 +119,18 @@ let format_data_lines data width =
 (** Produces OCaml source with OCaml submodules for directories and
     OCaml value definitions for files, with customizable mangling. *)
 module Static = struct
+  open OCamlResSubFormats
+
+  let sf_exts = ref []
+  let sf_mods = ref []
+
+  let list_subformats () =
+    SM.iter
+      (fun n m ->
+         let module M = (val m : SubFormat) in
+         Printf.printf "%s: %s\n" n M.info)
+      !subformats
+
   let esc name =
     let res = String.copy name in
     for i = 0 to String.length name - 1 do
@@ -145,6 +157,12 @@ module Static = struct
       | _ -> res
 
   let output fp root =
+    let sfs =
+      List.fold_left
+        (fun r (n, m) -> SM.add n m r)
+        SM.empty
+        (List.combine !sf_exts !sf_mods)
+    in
     let rec output lvl node =
       match node with
       | Error msg ->
@@ -154,27 +172,42 @@ module Static = struct
         List.iter (output (lvl ^ "  ")) nodes ;
         fprintf fp "%send\n%!" lvl
       | File (name, data) ->
-        let name = fst (OCamlRes.Path.split_ext name) in
-        fprintf fp "%slet %s =\n%!" lvl (esc_name name) ;
-        let lvl = lvl ^ " " in
-        let rec loop = function
-          | [] -> ()
-          | [ line ] -> fprintf fp "%s" line
-          | line :: (line2 :: _ as lines) when line2.[0] = ' ' ->
-            fprintf fp "%s\\\n%s\\" line lvl ; loop lines
-          | line :: lines ->
-            fprintf fp "%s\\\n%s " line lvl ; loop lines
-        in
-        fprintf fp "%s\"" lvl ;
-        loop (format_data_lines data (max 40 (77 - String.length lvl))) ;
-        fprintf fp "\"\n%!"
+        try
+          match OCamlRes.Path.split_ext name with
+          | _, None -> raise Not_found
+          | name, Some ext ->
+            let module F = (val (SM.find ext sfs) : SubFormat) in
+            fprintf fp "%slet %s = %!" lvl (esc_name name) ;
+            F.output fp (F.parse node) ;
+            fprintf fp "\n%!"
+        with Not_found ->
+          let name = fst (OCamlRes.Path.split_ext name) in
+          fprintf fp "%slet %s =\n%!" lvl (esc_name name) ;
+          let lvl = lvl ^ " " in
+          let rec loop = function
+            | [] -> ()
+            | [ line ] -> fprintf fp "%s" line
+            | line :: (line2 :: _ as lines) when line2.[0] = ' ' ->
+              fprintf fp "%s\\\n%s\\" line lvl ; loop lines
+            | line :: lines ->
+              fprintf fp "%s\\\n%s " line lvl ; loop lines
+          in
+          fprintf fp "%s\"" lvl ;
+          loop (format_data_lines data (max 40 (77 - String.length lvl))) ;
+          fprintf fp "\"\n%!"
     in
     List.iter
       (fun node -> output "" node)
       root
 
   let info = "produces static ocaml bindings (modules for dirs, values for files)"
-  let options = []
+  let options = [
+    "-subformat", Arg.(Tuple [ String (fun e -> sf_exts := e :: !sf_exts) ;
+                               String (fun e -> sf_mods := find e :: !sf_mods) ]),
+    "\"ext\" \"subformat\" preprocess files ending with \"ext\" as \"suformat\"" ;
+    "-list-subformats", Arg.Unit list_subformats,
+    "lists available subformats" ;
+  ]
 end
   
 let _ = register "static" (module Static)
