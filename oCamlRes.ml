@@ -104,11 +104,11 @@ end
 
 (** Resource store creation and access. *)
 module Res = struct
-  type root =
-    node list
-  and node =
-    | Dir of string * node list
-    | File of string * string
+  type 'a root =
+    'a node list
+  and 'a node =
+    | Dir of string * 'a node list
+    | File of string * 'a
     | Error of string
 
   module SM = Map.Make (String)
@@ -198,19 +198,19 @@ end
     operate on the already parsed tree but cannot prevent the reading
     of unnecessary files. *)
 module ResFilter = struct
-  type t = Res.node -> bool
+  type 'a t = 'a Res.node -> bool
 
-  let any : t =
+  let any : _ t =
     fun _ -> true
-  let none : t =
+  let none : _ t =
     fun _ -> false
-  let exclude (f : t) : t =
+  let exclude (f : 'a t) : 'a t =
     fun res -> not (f res)
-  let all_of (fs : t list) : t =
+  let all_of (fs : 'a t list) : 'a t =
     fun res -> List.fold_left (fun r f -> r && (f res)) true fs
-  let any_of (fs : t list) : t =
+  let any_of (fs : 'a t list) : 'a t =
     fun res -> List.fold_left (fun r f -> r || (f res)) false fs
-  let empty_dir : t = function Res.Dir (_, []) -> true | _ -> false
+  let empty_dir : _ t = function Res.Dir (_, []) -> true | _ -> false
 end
 
 (** Import the files from a base directory as a resource store root. *)

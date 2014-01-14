@@ -18,23 +18,31 @@ open OCamlRes.Path
 open OCamlRes.Res
 open Printf
 
-(** The type of output plug-ins *)
-module type Output = sig
+(** The type of format plug-ins *)
+module type Format = sig
   val info : string
-  val output : out_channel -> OCamlRes.Res.root -> unit
+  val output : out_channel -> string OCamlRes.Res.root -> unit
   val options : (Arg.key * Arg.spec * Arg.doc) list
 end
 
-(** A global registry for output plug-ins *)
-let output_modules : (string * (module Output)) list ref = ref []
+(** A global registry for format plug-ins *)
+let formats : (string * (module Format)) list ref = ref []
     
-(** Register a new named output module or override one. *)
-let register name (output : (module Output)) =
-  output_modules := (name, output) :: !output_modules
+(** Register a new named format module or override one. *)
+let register name (format : (module Format)) =
+  formats := (name, format) :: !formats
 
-(** Find an output module from its name. *)
-let find name : (module Output) =
-  List.assoc name !output_modules
+(** Find an format module from its name. *)
+let find name : (module Format) =
+  List.assoc name !formats
+
+(** Retrive the currently available formats *)
+let formats () =
+  List.map
+    (fun (name, m) ->
+       let module M = (val m : Format) in
+       name, M.info, M.options)
+    !formats
 
 (** Splits a big string into smaller chunks so is fits in a certain
     width. Respects the original line feeds if it ressembles a text
@@ -121,16 +129,6 @@ let format_data_lines data width =
 module Static = struct
   open OCamlResSubFormats
 
-  let sf_exts = ref []
-  let sf_mods = ref []
-
-  let list_subformats () =
-    SM.iter
-      (fun n m ->
-         let module M = (val m : SubFormat) in
-         Printf.printf "%s: %s\n" n M.info)
-      !subformats
-
   let esc name =
     let res = String.copy name in
     for i = 0 to String.length name - 1 do
@@ -157,12 +155,7 @@ module Static = struct
       | _ -> res
 
   let output fp root =
-    let sfs =
-      List.fold_left
-        (fun r (n, m) -> SM.add n m r)
-        SM.empty
-        (List.combine !sf_exts !sf_mods)
-    in
+    let sfs = OCamlResSubFormats.handled_subformats () in
     let rec output lvl node =
       match node with
       | Error msg ->
@@ -178,7 +171,7 @@ module Static = struct
           | name, Some ext ->
             let module F = (val (SM.find ext sfs) : SubFormat) in
             fprintf fp "%slet %s = %!" lvl (esc_name name) ;
-            F.output fp (F.parse node) ;
+            F.output fp (F.parse data) ;
             fprintf fp "\n%!"
         with Not_found ->
           let name = fst (OCamlRes.Path.split_ext name) in
@@ -201,13 +194,7 @@ module Static = struct
       root
 
   let info = "produces static ocaml bindings (modules for dirs, values for files)"
-  let options = [
-    "-subformat", Arg.(Tuple [ String (fun e -> sf_exts := e :: !sf_exts) ;
-                               String (fun e -> sf_mods := find e :: !sf_mods) ]),
-    "\"ext\" \"subformat\" preprocess files ending with \"ext\" as \"suformat\"" ;
-    "-list-subformats", Arg.Unit list_subformats,
-    "lists available subformats" ;
-  ]
+  let options = OCamlResSubFormats.options
 end
   
 let _ = register "static" (module Static)
@@ -216,7 +203,40 @@ let _ = register "static" (module Static)
     contains an OCamlRes tree to be used at runtime through the
     OCamlRes module. *)
 module Res = struct
+  let use_variants = ref true
+
   let output fp root =
+    let open OCamlResSubFormats in
+    let sfs = handled_subformats () in
+    let box =
+      let rec collect acc = function
+        | Dir (name, nodes) ->
+          List.fold_left collect acc nodes
+        | Error _ -> acc
+        | File (name, data) ->
+          try
+            match OCamlRes.Path.split_ext name with
+            | _, None -> raise Not_found
+            | name, Some ext ->
+              let module F = (val (SM.find ext sfs) : SubFormat) in
+              SM.add F.name F.ty acc
+          with Not_found -> SM.add "raw" "string" acc
+      in
+      match SM.bindings (List.fold_left collect SM.empty root) with
+      | [] | [ _ ] -> false
+      | l ->
+        if not !use_variants then begin
+          fprintf fp "type content =\n" ;
+          List.iter
+            (fun (c, t) -> fprintf fp "  | %s of %s\n" (String.capitalize c) t)
+            l ;
+          fprintf fp "\n%!"
+        end ; true
+    in
+    let cstr ext =
+      if not box then ""
+      else (if !use_variants then "`" else "") ^ String.capitalize ext ^ " "
+    in
     let rec output lvl node =
       match node with
       | Error msg ->
@@ -228,17 +248,26 @@ module Res = struct
       | File (name, data) ->
         fprintf fp "%sFile (%S,\n%!" lvl name ;
         let lvl = lvl ^ "  " in
-        let rec loop = function
-          | [] -> ()
-          | [ line ] -> fprintf fp "%s" line
-          | line :: (line2 :: _ as lines) when line2.[0] = ' ' ->
-            fprintf fp "%s\\\n%s\\" line lvl ; loop lines
-          | line :: lines ->
-            fprintf fp "%s\\\n%s " line lvl ; loop lines
-        in
-        fprintf fp "%s\"" lvl ;
-        loop (format_data_lines data (max 40 (78 - String.length lvl))) ;
-        fprintf fp "\") ;\n%!"
+        try
+          match OCamlRes.Path.split_ext name with
+          | _, None -> raise Not_found
+          | name, Some ext ->
+            let module F = (val (SM.find ext sfs) : SubFormat) in
+            fprintf fp "%s%s" lvl (cstr F.name) ;
+            F.output fp (F.parse data) ;
+            fprintf fp ")\n%!"
+        with Not_found ->
+          let rec loop = function
+            | [] -> ()
+            | [ line ] -> fprintf fp "%s" line
+            | line :: (line2 :: _ as lines) when line2.[0] = ' ' ->
+              fprintf fp "%s\\\n%s\\" line lvl ; loop lines
+            | line :: lines ->
+              fprintf fp "%s\\\n%s " line lvl ; loop lines
+          in
+          fprintf fp "%s%s\"" lvl (cstr "raw") ;
+          loop (format_data_lines data (max 40 (78 - String.length lvl))) ;
+          fprintf fp "\") ;\n%!"
     in
     fprintf fp "let root = OCamlRes.Res.([\n" ;
     List.iter
@@ -247,7 +276,10 @@ module Res = struct
     fprintf fp "])\n%!"
 
   let info = "produces the OCaml source representation of the OCamlRes tree"
-  let options = []
+  let options =
+    OCamlResSubFormats.options
+    @ [ "-no-variants", Arg.Clear use_variants,
+        "use a plain sum type instead of polymorphic variants" ]
 end
 
 let _ = register "ocamlres" (module Res)
@@ -280,7 +312,7 @@ module Files = struct
   let info = "reproduces the original files"
   let options = [
     "-output-dir", Arg.Set_string base_output_dir,
-    " set the base output directory (defaults to \".\")"]
+    "\"dir\"&set the base output directory (defaults to \".\")"]
 end
 
 let _ = register "files" (module Files)
