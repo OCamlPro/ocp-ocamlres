@@ -17,7 +17,7 @@ Some use-cases:
  * Maurice wants to distribute a single executable for portability so he includes its config files.
  * Jeanine is an indie game developper and she uses the tool to be sure at compile time that she never forgets some resource. She uses the "static" backend and using OCaml identifiers to identify her resources.
  * Henry Wants to build a single-binary installer, so he includes all the files as an ocamlres tree using the "ocamlres", format. Then he links the generated module with the ocamlres lib, and calls the "files" output backend at run-time to extract the files.
- * Veronica is a Web developper, and she does not like XHRs, so she embeds some od her resources directly inside her code.
+ * Veronica is a Web developper, and she does not like XHRs, so she embeds some of her resources directly inside her code.
 
 Help page:
 ----------
