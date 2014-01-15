@@ -14,9 +14,6 @@
  * You should have received a copy of the GNU General Public License
  * along with ocp-ocamlres.  If not, see <http://www.gnu.org/licenses/>. *)
 
-let preload_module name =
-  Dynlink.loadfile name
-
 (** Display help screen with options, formats, subformats and their options *)
 let help args usage =
   let arg_parts (n, t, msg) =
@@ -56,12 +53,13 @@ let help args usage =
     sfs ;
   exit 0
 
-
+(** Outputs the list of formats with their descriptions *)
 let list_formats () =
   let fs = OCamlResFormats.formats () in
   List.iter (fun (n, info, _) -> Printf.eprintf "%s: %s\n" n info) fs ;
   exit 0
 
+(** Outputs the list of subformats with their descriptions *)
 let list_subformats () =
   let sfs = OCamlResSubFormats.subformats () in
   List.iter (fun (n, info, _) -> Printf.eprintf "%s: %s\n" n info) sfs ;
@@ -76,6 +74,9 @@ let main () =
   let format = ref (module OCamlResFormats.Res : OCamlResFormats.Format) in
   let all_args = ref []
   and main_args = ref [] in
+  let preload_module name =
+    Dynlink.loadfile name
+  in
   let set_format name =
     format := OCamlResFormats.find name ;
     let module F = (val !format) in
