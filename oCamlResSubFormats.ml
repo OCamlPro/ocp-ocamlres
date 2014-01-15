@@ -17,7 +17,7 @@
 module type SubFormat = sig
   type t
   val parse : string -> t
-  val output : out_channel -> t -> unit
+  val pprint : t -> PPrint.document
   val name : string
   val ty : string
   val info : string
@@ -40,7 +40,7 @@ module Int = struct
   let parse str =
     Scanf.sscanf str "%i" (fun i -> i)
 
-  let output fp i = Printf.fprintf fp "%i" i
+  let pprint i = PPrint.OCaml.int i
   let name = "int" and ty = "int"
   let info = "files containing only an integer"
   let options = []

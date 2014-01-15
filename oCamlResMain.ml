@@ -116,6 +116,6 @@ let main () =
       (fun r d -> OCamlRes.(Res.merge_roots r (scan ~prefilter ~postfilter d)))
       [] !files
   in
-  F.output stdout root
+  F.output root
 
 let _ = main ()

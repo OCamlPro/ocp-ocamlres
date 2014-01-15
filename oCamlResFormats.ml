@@ -16,12 +16,15 @@
 
 open OCamlRes.Path
 open OCamlRes.Res
-open Printf
+open PPrint
 
 (** The type of format plug-ins *)
 module type Format = sig
+  (** A short dexcription for the help page *)
   val info : string
-  val output : out_channel -> string OCamlRes.Res.root -> unit
+  (** Pretty print a resource store to a PPrint document *)
+  val output : string root -> unit
+  (** The list of specific arguments *)
   val options : (Arg.key * Arg.spec * Arg.doc) list
 end
 
@@ -44,10 +47,9 @@ let formats () =
        name, M.info, M.options)
     !formats
 
-(** Splits a big string into smaller chunks so is fits in a certain
-    width. Respects the original line feeds if it ressembles a text
-    file, otherwise produces a big block. *)
-let format_data_lines data width =
+(** Splits a string into a flow of escaped characters. Respects
+    the original line feeds if it ressembles a text file. *)
+let format_string width data =
   let len = String.length data in
   let looks_like_text =
     let rec loop i acc =
@@ -62,72 +64,79 @@ let format_data_lines data width =
   in
   let  hexd = [| '0' ; '1' ; '2' ; '3' ; '4' ; '5' ; '6' ; '7' ;
                  '8' ; '9' ; 'A' ; 'B' ; 'C' ; 'D' ; 'E' ; 'F' |] in
-  if looks_like_text then
-    let buf = Buffer.create width in
-    let rec loop acc i j =
-      if i = len then
-        if j <> 0 then
-          let line = Buffer.contents buf in
-          Buffer.clear buf ;
-          line :: acc
-        else acc
-      else if j = width then
-        let line = Buffer.contents buf in
-        Buffer.clear buf ;
-        loop (line :: acc) i 0
-      else
-        match data.[i] with
-        | '\r' ->
-          Buffer.add_string buf "\\r" ;
-          loop acc (i + 1)
-            (if i + 1 < len && data.[i] = '\n' then j + 2 else width)
-        | '\n' ->
-          Buffer.add_string buf "\\n" ;
-          loop acc (i + 1) width
-        | '\t' ->
-          Buffer.add_string buf "\\t" ;
-          loop acc (i + 1) (j + 2)
-        | '"' | '\\' as c ->
-          Buffer.add_char buf '\\' ;
-          Buffer.add_char buf c ;
-          loop acc (i + 1) (j + 2)
-        | c when Char.code c > 128 || Char.code c < 32 ->
-          let c = Char.code c in
-          Buffer.add_char buf '\\' ;
-          Buffer.add_char buf 'x' ;
-          Buffer.add_char buf(hexd.(c lsr 4)) ;
-          Buffer.add_char buf (hexd.(c land 15)) ;
-          loop acc (i + 1) (j + 4)
-        | c ->
-          Buffer.add_char buf c ;
-          loop acc (i + 1) (j + 1)
-    in List.rev (loop [] 0 0)
+  if not looks_like_text then
+    column
+      (fun col ->
+         let cwidth = (width - col) / 4 in
+         let rec split acc ofs =
+           if ofs >= len then List.rev acc
+           else
+             let blen = min cwidth (len - ofs) in
+             let blob = String.create (blen * 4) in
+             for i = 0 to blen - 1 do
+               let c = Char.code data.[ofs + i] in
+               blob.[i * 4] <- '\\' ;
+               blob.[i * 4 + 1] <- 'x' ;
+               blob.[i * 4 + 2] <- (hexd.(c lsr 4)) ;
+               blob.[i * 4 + 3] <- (hexd.(c land 15)) ;
+             done ;
+             let blob = if ofs <> 0 then !^" " ^^ !^blob else !^blob in
+             split (blob :: acc) (ofs + blen)
+         in
+         !^"\"" ^^ separate (!^"\\" ^^ hardline) (split [] 0)) ^^ !^"\""
   else
-    let buf = Buffer.create width in
-    let rec loop acc i j =
-      if i = len then
-        if j <> 0 then
-          let line = Buffer.contents buf in
-          Buffer.clear buf ;
-          line :: acc
-        else acc
-      else if j = width / 4 then
-          let line = Buffer.contents buf in
-          Buffer.clear buf ;
-          loop (line :: acc) i 0
-      else
-        let c = Char.code data.[i] in
-        Buffer.add_char buf '\\' ;
-        Buffer.add_char buf 'x' ;
-        Buffer.add_char buf(hexd.(c lsr 4)) ;
-        Buffer.add_char buf (hexd.(c land 15)) ;
-        loop acc (i + 1) (j + 1)
-    in List.rev (loop [] 0 0)
+    let do_one_char cur next =
+      match cur, next with
+      | ' ', _ ->
+        group (ifflat !^" " (!^"\\" ^^ hardline ^^ !^"\\ "))
+      | '\r', '\n' ->
+        group (ifflat !^"\\r" (!^"\\" ^^ hardline ^^ !^" \\r"))
+      | '\r', ' ' ->
+        ifflat !^"\\r"
+          (group (ifflat !^"\\r" (!^"\\" ^^ hardline ^^ !^" \\r"))
+              ^^ !^"\\" ^^ hardline ^^ !^"\\")
+      | '\r', _ ->
+        ifflat !^"\\r"
+          (group (ifflat !^"\\r" (!^"\\" ^^ hardline ^^ !^" \\r"))
+           ^^ !^"\\" ^^ hardline ^^ !^" ")
+      | '\n', ' ' ->
+        ifflat !^"\\n"
+          (group (ifflat !^"\\n" (!^"\\" ^^ hardline ^^ !^" \\n"))
+           ^^ !^"\\" ^^ hardline ^^ !^"\\")
+      | '\n', _ ->
+        ifflat !^"\\n"
+          (group (ifflat !^"\\n" (!^"\\" ^^ hardline ^^ !^" \\n"))
+           ^^ !^"\\" ^^ hardline ^^ !^" ")
+      | '\t', _ ->
+        group (ifflat !^"\\t" (!^"\\" ^^ hardline ^^ !^" \\t"))
+      | '"', _ ->
+        group (ifflat !^"\\\"" (!^"\\" ^^ hardline ^^ !^" \\\""))
+      | '\\', _ ->
+        group (ifflat !^"\\\\" (!^"\\" ^^ hardline ^^ !^" \\\\"))
+      | c, _ ->
+        let fmt =
+          if Char.code c > 128 || Char.code c < 32 then
+            let c = Char.code c in
+            let s = String.create 4 in
+            s.[0] <- '\\' ; s.[1] <- 'x' ;
+            s.[2] <- (hexd.(c lsr 4)) ; s.[3] <- (hexd.(c land 15)) ;
+            s
+          else String.make 1 c
+        in
+        group (ifflat !^fmt (!^"\\" ^^ hardline ^^ !^" " ^^ !^fmt))
+    in
+    let res = ref empty in
+    for i = 0 to len - 2 do
+      res := !res ^^ do_one_char data.[i] data.[succ i]
+    done ;
+    if len > 0 then res := !res ^^ do_one_char data.[len - 1] '\000' ;
+    group (!^"\"" ^^ !res ^^ !^"\"")
 
 (** Produces OCaml source with OCaml submodules for directories and
     OCaml value definitions for files, with customizable mangling. *)
 module Static = struct
   open OCamlResSubFormats
+  let width = ref 80
 
   let esc name =
     let res = String.copy name in
@@ -154,47 +163,38 @@ module Static = struct
       | 'a'..'z' -> String.capitalize res
       | _ -> res
 
-  let output fp root =
+  let output root =
     let sfs = OCamlResSubFormats.handled_subformats () in
-    let rec output lvl node =
+    let rec output node =
       match node with
       | Error msg ->
-        fprintf fp "%s(* Error: %s *)\n%!" lvl msg
+        !^"(* Error: " ^^ !^ msg ^^ !^ " *)"
       | Dir (name, nodes) ->
-        fprintf fp "%smodule %s = struct\n%!" lvl (esc_dir name) ;
-        List.iter (output (lvl ^ "  ")) nodes ;
-        fprintf fp "%send\n%!" lvl
+        group (!^"module " ^^ !^(esc_dir name) ^^ !^" = struct"
+               ^^ nest 2 (break 1
+                          ^^ separate_map (break 1) output nodes)
+               ^^ break 1 ^^ !^"end")
       | File (name, data) ->
         try
           match OCamlRes.Path.split_ext name with
           | _, None -> raise Not_found
           | name, Some ext ->
             let module F = (val (SM.find ext sfs) : SubFormat) in
-            fprintf fp "%slet %s = %!" lvl (esc_name name) ;
-            F.output fp (F.parse data) ;
-            fprintf fp "\n%!"
+            group (!^"let " ^^ !^(esc_name name) ^^ !^" ="
+                   ^^ nest 2 (break 1 ^^ F.pprint (F.parse data)))
         with Not_found ->
           let name = fst (OCamlRes.Path.split_ext name) in
-          fprintf fp "%slet %s =\n%!" lvl (esc_name name) ;
-          let lvl = lvl ^ " " in
-          let rec loop = function
-            | [] -> ()
-            | [ line ] -> fprintf fp "%s" line
-            | line :: (line2 :: _ as lines) when line2.[0] = ' ' ->
-              fprintf fp "%s\\\n%s\\" line lvl ; loop lines
-            | line :: lines ->
-              fprintf fp "%s\\\n%s " line lvl ; loop lines
-          in
-          fprintf fp "%s\"" lvl ;
-          loop (format_data_lines data (max 40 (77 - String.length lvl))) ;
-          fprintf fp "\"\n%!"
+            group (!^"let " ^^ !^(esc_name name) ^^ !^" ="
+                   ^^ nest 2 (break 1 ^^ format_string !width data))
     in
-    List.iter
-      (fun node -> output "" node)
-      root
+    let res = separate_map (break 1) (fun node -> output node) root in
+    PPrint.ToChannel.pretty 0.8 80 stdout (res ^^ hardline)
 
   let info = "produces static ocaml bindings (modules for dirs, values for files)"
-  let options = OCamlResSubFormats.options
+  let options =
+    OCamlResSubFormats.options
+    @ [ "-width", Set_int width,
+        "set the maximum chars per line of generated code" ]
 end
   
 let _ = register "static" (module Static)
@@ -204,11 +204,11 @@ let _ = register "static" (module Static)
     OCamlRes module. *)
 module Res = struct
   let use_variants = ref true
+  let width = ref 80
 
-  let output fp root =
-    let open OCamlResSubFormats in
-    let sfs = handled_subformats () in
-    let box =
+  let output root =
+    let sfs = OCamlResSubFormats.handled_subformats () in
+    let prefix, box =
       let rec collect acc = function
         | Dir (name, nodes) ->
           List.fold_left collect acc nodes
@@ -218,68 +218,63 @@ module Res = struct
             match OCamlRes.Path.split_ext name with
             | _, None -> raise Not_found
             | name, Some ext ->
-              let module F = (val (SM.find ext sfs) : SubFormat) in
+              let module F = (val (SM.find ext sfs)) in
               SM.add F.name F.ty acc
           with Not_found -> SM.add "raw" "string" acc
       in
       match SM.bindings (List.fold_left collect SM.empty root) with
-      | [] | [ _ ] -> false
+      | [] | [ _ ] -> empty, false
       | l ->
-        if not !use_variants then begin
-          fprintf fp "type content =\n" ;
-          List.iter
-            (fun (c, t) -> fprintf fp "  | %s of %s\n" (String.capitalize c) t)
-            l ;
-          fprintf fp "\n%!"
-        end ; true
+        (if not !use_variants then
+           group (!^"type content ="
+                    ^^ nest 2 (break 1
+                               ^^ separate_map (break 1)
+                                 (fun (c, t) ->
+                                    !^"| " ^^ !^ (String.capitalize c)
+                                    ^^ !^" of " ^^ !^t)
+                                 l))
+         else empty), true
     in
     let cstr ext =
       if not box then ""
       else (if !use_variants then "`" else "") ^ String.capitalize ext ^ " "
     in
-    let rec output lvl node =
+    let rec output node =
       match node with
       | Error msg ->
-        fprintf fp "%s(* Error: %s *)\n%!" lvl msg
+        !^"(* Error: " ^^ !^ msg ^^ !^ " *)"
       | Dir (name, nodes) ->
-        fprintf fp "%sDir (%S, [\n%!" lvl name ;
-        List.iter (output (lvl ^ "  ")) nodes ;
-        fprintf fp "%s]) ;\n%!" lvl ;
+        let items = separate_map (!^" ;" ^^ break 1) output nodes in
+        group (!^"Dir (\"" ^^ !^name ^^ !^"\", ["
+               ^^ nest 2 (break 1 ^^ items)
+               ^^ !^"])")
       | File (name, data) ->
-        fprintf fp "%sFile (%S,\n%!" lvl name ;
-        let lvl = lvl ^ "  " in
-        try
+        let contents =
+          try
           match OCamlRes.Path.split_ext name with
           | _, None -> raise Not_found
           | name, Some ext ->
-            let module F = (val (SM.find ext sfs) : SubFormat) in
-            fprintf fp "%s%s" lvl (cstr F.name) ;
-            F.output fp (F.parse data) ;
-            fprintf fp ")\n%!"
-        with Not_found ->
-          let rec loop = function
-            | [] -> ()
-            | [ line ] -> fprintf fp "%s" line
-            | line :: (line2 :: _ as lines) when line2.[0] = ' ' ->
-              fprintf fp "%s\\\n%s\\" line lvl ; loop lines
-            | line :: lines ->
-              fprintf fp "%s\\\n%s " line lvl ; loop lines
-          in
-          fprintf fp "%s%s\"" lvl (cstr "raw") ;
-          loop (format_data_lines data (max 40 (78 - String.length lvl))) ;
-          fprintf fp "\") ;\n%!"
+            let module F = (val (SM.find ext sfs)) in
+            !^(cstr F.name) ^^ F.pprint (F.parse data)
+          with Not_found ->
+            !^(cstr "raw") ^^ format_string !width data
+        in
+        group (!^"File (\"" ^^ !^name ^^ !^"\","
+               ^^ nest 2 (break 1 ^^ contents ^^ !^")"))
     in
-    fprintf fp "let root = OCamlRes.Res.([\n" ;
-    List.iter
-      (fun node -> output "  " node)
-      root ;
-    fprintf fp "])\n%!"
+    let items = (separate_map (!^" ;" ^^ break 1) output root) in
+    let res =
+      !^"let root = OCamlRes.Res.([" ^^ nest 2 (break 1 ^^ items) ^^ !^"])"
+    in
+    PPrint.ToChannel.pretty 0.8 80 stdout (res ^^ hardline)
 
   let info = "produces the OCaml source representation of the OCamlRes tree"
   let options =
     OCamlResSubFormats.options
     @ [ "-no-variants", Arg.Clear use_variants,
-        "use a plain sum type instead of polymorphic variants" ]
+        "use a plain sum type instead of polymorphic variants" ;
+        "-width", Set_int width,
+        "set the maximum chars per line of generated code" ]
 end
 
 let _ = register "ocamlres" (module Res)
@@ -289,11 +284,11 @@ let _ = register "ocamlres" (module Res)
 module Files = struct
   let base_output_dir = ref "."
 
-  let output fp root =
+  let output root =
     let rec output base node =
       match node with
       | Error msg ->
-        eprintf "Error: %s\n%!" msg
+        Printf.eprintf "Error: %s\n%!" msg
       | Dir (name, nodes) ->
         let dir = base ^ "/" ^ name in
         Unix.handle_unix_error (Unix.mkdir dir) 0o750 ;

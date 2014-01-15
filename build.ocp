@@ -4,7 +4,7 @@ begin library "ocplib-ocamlres"
       	    "oCamlResSubFormats.ml"
       	    "oCamlResFormats.ml"
       ]
-      requires = [ "str" "unix" "dynlink" ]
+      requires = [ "str" "unix" "dynlink" "pprint" ]
       asmcomp = [ "-g" ]
 end
 
