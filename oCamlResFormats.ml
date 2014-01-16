@@ -168,6 +168,7 @@ module Static = struct
 
   let output root =
     let sfs = OCamlResSubFormats.handled_subformats () in
+    let prefix = ref empty in
     let rec output node =
       match node with
       | Error msg ->
@@ -199,7 +200,7 @@ module Static = struct
   let info = "produces static ocaml bindings (modules for dirs, values for files)"
   let options =
     OCamlResSubFormats.options
-    @ [ "-width", Set_int width,
+    @ [ "-width", Arg.Set_int width,
         "set the maximum chars per line of generated code" ]
 end
   
@@ -284,7 +285,7 @@ module Res = struct
     OCamlResSubFormats.options
     @ [ "-no-variants", Arg.Clear use_variants,
         "use a plain sum type instead of polymorphic variants" ;
-        "-width", Set_int width,
+        "-width", Arg.Set_int width,
         "set the maximum chars per line of generated code" ]
 end
 
