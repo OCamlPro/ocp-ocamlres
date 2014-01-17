@@ -15,11 +15,20 @@ ocp-ocamlres.asm: ocplib-ocamlres.cmxa oCamlResMain.cmx
 %.cmx: %.ml
 	ocamlfind ocamlopt -g -c -package $(PACKAGES) $<
 
-ocplib-ocamlres.cma: oCamlRes.cmo oCamlResSubFormats.cmo oCamlResFormats.cmo
+ocplib-ocamlres.cma: \
+  oCamlRes.cmo \
+  oCamlResSubFormats.cmo oCamlResFormats.cmo \
+  oCamlResRegistry.cmo
 	ocamlfind ocamlc -a -package $(PACKAGES) $^ -o $@
 
-ocplib-ocamlres.cmxa: oCamlRes.cmx oCamlResSubFormats.cmx oCamlResFormats.cmx
+ocplib-ocamlres.cmxa: \
+  oCamlRes.cmx \
+  oCamlResSubFormats.cmx oCamlResFormats.cmx \
+  oCamlResRegistry.cmx
 	ocamlfind ocamlopt -a -package $(PACKAGES) $^ -o $@
+
+oCamlResRegistry.cmx: oCamlResFormats.cmx
+oCamlResRegistry.cmo: oCamlResFormats.cmo
 
 oCamlResFormats.cmx: oCamlResSubFormats.cmx oCamlRes.cmx
 oCamlResFormats.cmo: oCamlResSubFormats.cmo oCamlRes.cmo

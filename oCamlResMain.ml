@@ -14,6 +14,8 @@
  * You should have received a copy of the GNU General Public License
  * along with ocp-ocamlres.  If not, see <http://www.gnu.org/licenses/>. *)
 
+open OCamlResRegistry
+
 (** Display help screen with options, formats, subformats and their options *)
 let help args usage =
   let arg_parts (n, t, msg) =
@@ -23,8 +25,19 @@ let help args usage =
       n, String.length n, String.sub msg (i + 1) (String.length msg - i - 1)
     with Not_found -> n, String.length n, msg
   in
-  let fs = OCamlResFormats.formats () in
-  let sfs = OCamlResSubFormats.subformats () in
+  let fs =
+    List.map
+      (fun (n, m) ->
+         let module F = (val m : Format) in
+         n, F.info, F.options)
+      (SM.bindings (formats ()))
+  and sfs =
+    List.map
+      (fun (n, m) ->
+         let module SF = (val m : SubFormat) in
+         n, SF.info, SF.options)
+      (SM.bindings (subformats ()))
+  in
   let args, fs, sfs =
     let f l = List.map (fun (n, i, o) -> (n, i, List.map arg_parts o)) l in
     List.map arg_parts args, f fs, f sfs
@@ -55,14 +68,20 @@ let help args usage =
 
 (** Outputs the list of formats with their descriptions *)
 let list_formats () =
-  let fs = OCamlResFormats.formats () in
-  List.iter (fun (n, info, _) -> Printf.eprintf "%s: %s\n" n info) fs ;
+  SM.iter
+    (fun n m ->
+       let module F = (val m : Format) in
+       Printf.printf "%s: %s\n" n F.info)
+    (formats ()) ;
   exit 0
 
 (** Outputs the list of subformats with their descriptions *)
 let list_subformats () =
-  let sfs = OCamlResSubFormats.subformats () in
-  List.iter (fun (n, info, _) -> Printf.eprintf "%s: %s\n" n info) sfs ;
+  SM.iter
+    (fun n m ->
+       let module SF = (val m : SubFormat) in
+       Printf.printf "%s: %s\n" n SF.info)
+    (subformats ()) ;
   exit 0
 
 (** Parse the preload arguments, scan and filter the files, select the
@@ -71,14 +90,14 @@ let main () =
   let files = ref [] in
   let exts = ref [] in
   let skip_empty_dirs = ref true in
-  let format = ref (module OCamlResFormats.Res : OCamlResFormats.Format) in
+  let format = ref (module Res : Format) in
   let all_args = ref []
   and main_args = ref [] in
   let preload_module name =
     Dynlink.loadfile name
   in
   let set_format name =
-    format := OCamlResFormats.find name ;
+    format := find_format name ;
     let module F = (val !format) in
     all_args := !main_args @ F.options
   in
@@ -98,7 +117,7 @@ let main () =
     "-keep-empty-dirs", Arg.Clear skip_empty_dirs,
     "keep empty dirs in scanned files"
   ] ;
-  set_format "static" ;
+  set_format "ocamlres" ;
   (try
      Arg.parse_argv_dynamic Sys.argv all_args (fun p -> files := p :: !files) usage
    with
