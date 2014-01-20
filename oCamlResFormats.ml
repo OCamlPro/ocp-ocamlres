@@ -70,26 +70,26 @@ module OCaml (SF : SubFormat) (O : OCamlOptions) = struct
       | _ -> res
 
   let output root =
-    let prefix = ref [] in
+    let hd = ref [] and ft = ref [] in
     let rec output dirs node =
       match node with
       | Error msg ->
         !^"(* Error: " ^^ !^ msg ^^ !^ " *)"
       | Dir (name, nodes) ->
+        let items = separate_map (break 1) (output (name :: dirs)) nodes in
         group (!^"module " ^^ !^(esc_dir name) ^^ !^" = struct"
-               ^^ nest 2 (break 1
-                          ^^ separate_map (break 1) (output (name :: dirs)) nodes)
+               ^^ nest 2 (break 1 ^^ items)
                ^^ break 1 ^^ !^"end")
       | File (name, d) ->
         let p = (List.rev dirs, Some (split_ext name)) in
         let out = column (fun col -> SF.pprint col (O.width ()) p d) in
-        (match SF.prefix p d with None -> () | Some p -> prefix := p :: !prefix) ;
-        group (!^"let " ^^ !^(esc_name name) ^^ !^" ="
-               ^^ nest 2 (break 1 ^^ out))
+        (match SF.pprint_header p d with None -> () | Some p -> hd := p :: !hd) ;
+        (match SF.pprint_footer p d with None -> () | Some p -> ft := p :: !ft) ;
+        group (!^"let " ^^ !^(esc_name name) ^^ !^" =" ^^ nest 2 (break 1 ^^ out))
 
     in
     let defs = List.map (fun node -> output [] node) root in
-    let res = separate hardline (List.rev !prefix @ defs) in
+    let res = separate hardline (List.rev !hd @ defs @ List.rev !ft) in
     PPrint.ToChannel.pretty 0.8 80 (O.out_channel ()) (res ^^ hardline)
 end
 
@@ -110,26 +110,27 @@ module Res (SF : SubFormat) (O : ResOptions) = struct
   type t = SF.t
 
   let output root =
-    let prefix, box =
+    let hd = ref [] and ft = ref [] in
+    let box =
       let rec collect dirs acc = function
         | Dir (d, nodes) ->
           List.fold_left (collect (d :: dirs)) acc nodes
         | Error _ -> acc
         | File (name, data) ->
           let p = List.rev dirs, Some (split_ext name) in
-          SM.add (SF.name p data) (SF.ty p data) acc
+          SM.add (SF.name p data) (SF.type_name p data) acc
       in
       match SM.bindings (List.fold_left (collect []) SM.empty root) with
-      | [] | [ _ ] -> ref [], false
+      | [] | [ _ ] -> false
       | l ->
-        (if not (O.use_variants ()) then
-           let cases =
-             separate_map hardline
-               (fun (c, t) ->
-                  !^"| " ^^ !^ (String.capitalize c) ^^ !^" of " ^^ !^t) l
-           in
-           ref [ group (!^"type content =" ^^ nest 2 (hardline ^^ cases)) ]
-         else ref []), true
+        if not (O.use_variants ()) then begin
+          let cases =
+            separate_map hardline
+              (fun (c, t) ->
+                 !^"| " ^^ !^ (String.capitalize c) ^^ !^" of " ^^ !^t) l
+          in
+          hd := [ group (!^"type content =" ^^ nest 2 (hardline ^^ cases)) ]
+        end ; true
     in
     let cstr ext =
       if not box then ""
@@ -147,8 +148,8 @@ module Res (SF : SubFormat) (O : ResOptions) = struct
       | File (name, d) ->
         let p = (List.rev dirs, Some (split_ext name)) in
         let out = column (fun col -> SF.pprint col (O.width ()) p d) in
-        (match SF.prefix p d with None -> () | Some p -> prefix := p :: !prefix) ;
-        let name = SF.name p d in
+        (match SF.pprint_header p d with None -> () | Some p -> hd := p :: !hd) ;
+        (match SF.pprint_footer p d with None -> () | Some p -> ft := p :: !ft) ;
         group (!^"File (\"" ^^ !^name ^^ !^"\","
                ^^ nest 2 (break 1 ^^ !^(cstr name) ^^ out ^^ !^")"))
     in
@@ -157,35 +158,38 @@ module Res (SF : SubFormat) (O : ResOptions) = struct
       !^"let root = OCamlRes.Res.([" ^^ nest 2 (break 1 ^^ items)
       ^^ break 1 ^^ !^"])"
     in
-    let res = separate hardline (List.rev (body :: !prefix)) in
+    let res = separate hardline (List.rev (!ft @ [ body ] @ !hd)) in
     PPrint.ToChannel.pretty 0.8 80 (O.out_channel ()) (res ^^ hardline)
 end
 
 (** Reproduces the original scanned files (or creates new ones in case
     of a forged resource store). *)
-module Files = struct
-  type t = string
+module Files (SF : SubFormat) = struct
+  type t = SF.t
 
   let base_output_dir = ref "."
 
   let output root =
-    let rec output base node =
+    let rec output dirs node =
       match node with
       | Error msg ->
         Printf.eprintf "Error: %s\n%!" msg
-      | Dir (name, nodes) ->
-        let dir = base ^ "/" ^ name in
-        Unix.handle_unix_error (Unix.mkdir dir) 0o750 ;
-        List.iter (output dir) nodes ;
+      | Dir (d, nodes) ->
+        let p = (List.rev dirs, Some (d, None)) in
+        let fspath = !base_output_dir ^ OCamlRes.Path.to_string p in
+        Unix.handle_unix_error (Unix.mkdir fspath) 0o750 ;
+        List.iter (output (d :: dirs)) nodes ;
       | File (name, data) ->
-        let chan = open_out_bin (base ^ "/" ^ name) in
-        output_string chan data ;
+        let p = (List.rev dirs, Some (split_ext name)) in
+        let fspath = !base_output_dir ^ OCamlRes.Path.to_string p in
+        let chan = open_out_bin fspath in
+        output_string chan (SF.to_raw p data) ;
         close_out chan
     in
     if not (Sys.file_exists !base_output_dir) then
       Unix.handle_unix_error (Unix.mkdir !base_output_dir) 0o750 ;
     List.iter
-      (fun node -> output !base_output_dir node)
+      (fun node -> output [] node)
       root
 
   let info = "reproduces the original files"

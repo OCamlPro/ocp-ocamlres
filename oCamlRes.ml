@@ -16,6 +16,7 @@
 
 (** Paths inside resource stores. *)
 module Path = struct
+
   (** A path is a list of directory names and optionally a file name
       which is itself decomposed into a basename and an optional extension. *)
   type t = dirs * name option
@@ -78,8 +79,20 @@ module Path = struct
       | _, [] -> List.rev acc
     in loop [] dirs, file
 
+  (** Alias for {!split_ext}. *)
+  let name_of_string pstr =
+    if String.length pstr = 0 then invalid_arg "OCamlRes.Path.name_of_string" ;
+    split_ext pstr
+
+  (** Inverse of {!split_ext}. *)
+  let string_of_name (name, ext) =
+    match ext with
+    | None -> name
+    | Some ext -> name ^ "." ^ ext
+
   (** Turns a Unix-like path string into a {!t}. *)
   let of_string pstr =
+    if String.length pstr = 0 then invalid_arg "OCamlRes.Path.of_string" ;
     let dirs, base = split_base pstr in
     let path =
       match base with
@@ -102,67 +115,10 @@ module Path = struct
     Buffer.contents buf
 end
 
-(** Resource store creation and access. *)
-module Res = struct
-  type 'a root =
-    'a node list
-  and 'a node =
-    | Dir of string * 'a node list
-    | File of string * 'a
-    | Error of string
-
-  module SM = Map.Make (String)
-  module SS = Set.Make (String)
-      
-  (** Merges two resources *)
-  let rec merge node1 node2 =
-    match node1, node2 with
-    | Dir (n1, l1), Dir (n2, l2) ->
-      if n1 <> n2 then
-        [ node1 ; node2 ]
-      else
-        [ Dir (n1, merge_roots l1 l2) ]
-    | (File (n, _) as f), (Dir (nd, _) as dir)
-    | (Dir (nd, _) as dir), (File (n, _) as f) ->
-      if n <> nd then
-        [ f ; dir ]
-      else
-        [ Error ("unmergeable versions of " ^ n) ]
-    | (File (n1, c1) as f1), (File (n2, c2) as f2) ->
-      if n1 <> n2 || c1 = c2 then
-        [ f1 ; f2 ]
-      else
-        [ Error ("unmergeable versions of " ^ n1) ]
-    | (Error _ as e), n | n, (Error _ as e) ->
-      [ e ; n ]
-  (** Merges two resource stores *)
-  and merge_roots rl rr =
-    let files = ref SM.empty in
-    let errors = ref SS.empty in
-    let do_one =
-      List.iter
-        (fun node ->
-           let to_add = match node with
-             | Dir (n, _) | File (n, _) as f ->
-               (try merge f (SM.find n !files) with Not_found -> [ f ])
-             | Error _ as e -> [ e ]
-           in 
-           List.iter
-             (function
-               | Error msg ->
-                 errors := SS.add msg !errors
-               | Dir (n, _) | File (n, _) as f ->
-                 files := SM.add n f !files)
-             to_add)
-    in
-    do_one rl ;
-    do_one rr ;
-    snd (List.split (SM.bindings !files))
-    @ List.map (fun msg -> Error msg) (SS.elements !errors )
-end
-
-(** Filters used to select the files and dirs to be scanned. *)
+(** Predicates for filtering paths. Used to select the files and dirs
+    to be scanned. *)
 module PathFilter = struct
+
   type t = Path.t -> bool
 
   let any : t =
@@ -191,6 +147,117 @@ module PathFilter = struct
       | (_, Some (_, Some ext)) -> SS.mem ext exts
       | (_, None) -> true
       | _ -> false
+end
+
+(** Resource store creation and access. *)
+module Res = struct
+
+  (** A resource: a directory of named sub-resources, a file, or an
+      error token (useful to write more resilient treatments). *)
+  type 'a node =
+    | Dir of string * 'a node list
+    | File of string * 'a
+    | Error of string
+
+  (** A ressource store (a list of toplevel resources) *)
+  type 'a root =
+    'a node list
+
+  module SM = Map.Make (String)
+  module SS = Set.Make (String)
+      
+  (** Merges two resources *)
+  let rec merge_nodes node1 node2 =
+    match node1, node2 with
+    | Dir (n1, l1), Dir (n2, l2) ->
+      if n1 <> n2 then
+        [ node1 ; node2 ]
+      else
+        [ Dir (n1, merge l1 l2) ]
+    | (File (n, _) as f), (Dir (nd, _) as dir)
+    | (Dir (nd, _) as dir), (File (n, _) as f) ->
+      if n <> nd then
+        [ f ; dir ]
+      else
+        [ Error ("unmergeable versions of " ^ n) ]
+    | (File (n1, c1) as f1), (File (n2, c2) as f2) ->
+      if n1 <> n2 || c1 = c2 then
+        [ f1 ; f2 ]
+      else
+        [ Error ("unmergeable versions of " ^ n1) ]
+    | (Error _ as e), n | n, (Error _ as e) ->
+      [ e ; n ]
+
+  (** Merges two resource stores *)
+  and merge (rl : 'a root) (rr : 'a root) : 'a root =
+    let files = ref SM.empty in
+    let errors = ref SS.empty in
+    let do_one =
+      List.iter
+        (fun node ->
+           let to_add = match node with
+             | Dir (n, _) | File (n, _) as f ->
+               (try merge_nodes f (SM.find n !files) with Not_found -> [ f ])
+             | Error _ as e -> [ e ]
+           in 
+           List.iter
+             (function
+               | Error msg ->
+                 errors := SS.add msg !errors
+               | Dir (n, _) | File (n, _) as f ->
+                 files := SM.add n f !files)
+             to_add)
+    in
+    do_one rl ;
+    do_one rr ;
+    snd (List.split (SM.bindings !files))
+    @ List.map (fun msg -> Error msg) (SS.elements !errors )
+
+  (** Find a resource from its path. *)
+  let rec find (path : Path.t) (root : 'a root) : 'a =
+    match root, path with
+    | File (name, data) :: ns, ([d], None) -> (* let's be flexible *)
+      if name = d then data else find path ns
+    | File (name, data) :: ns, ([], Some n) ->
+      if name = Path.string_of_name n then data else find path ns
+    | Dir (name, ns) :: ps, (d :: ds, f) ->
+      if name = d then find (ds, f) ns else find path ps
+    | (Error _ | Dir _ | File _) :: ps, (_, Some n) ->
+      find path ps
+    | _, _ -> raise Not_found
+
+  (** Find a directory (as a root) from its path. *)
+  let rec find_dir (path : Path.t) (root : 'a root) : 'a root =
+    match root, path with
+    | _, ([], None) -> root
+    | [], _ -> raise Not_found
+    | Dir (name, ns) :: ps, (d :: ds, f) ->
+      if name = d then find_dir (ds, f) ns else find_dir path ps
+    | Dir (name, ns) :: ps, ([], Some f) -> (* let's be flexible *)
+      if name = Path.string_of_name f then ns else find_dir path ps
+    | (Error _ | File _) :: ps, _ ->
+      find_dir path ps
+
+  (** Build a new root with an added file. *)
+  let rec add (path : Path.t) (data : 'a) (root : 'a root) : 'a root =
+    match root, path with
+    | [], ([], None) ->
+      raise (Invalid_argument "OCamlRes.Res.add")
+    | [], ([], Some n) ->
+      [ File (Path.string_of_name n, data) ]
+    | [], (d :: ds, f) ->
+      [ Dir (d, add (ds, f) data []) ]
+    | (Dir (n, _) | File (n, _)) :: _, ([d], None) when n = d ->
+      raise (Failure "OCamlRes.Res.add: already exists")
+    | (Dir (n, _) | File (n, _)) :: _, ([], Some f)
+      when n = (Path.string_of_name f) ->
+      raise (Failure "OCamlRes.Res.add: already exists")
+    | Dir (name, ns) as dir :: ps, (d :: ds, f) ->
+      if name = d then 
+        [ Dir (name, add (ds, f) data ns) ]
+      else dir :: add path data ps
+    | first :: ps, _ ->
+      first :: add path data ps
 end
 
 (** Filters used to clean the resource store after importing resources

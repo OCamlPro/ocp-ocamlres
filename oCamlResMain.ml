@@ -133,7 +133,7 @@ let main () =
   let module F = (val !format) in
   let root =
     List.fold_left
-      (fun r d -> OCamlRes.(Res.merge_roots r (scan ~prefilter ~postfilter d)))
+      (fun r d -> OCamlRes.(Res.merge r (scan ~prefilter ~postfilter d)))
       [] !files
   in
   F.output root
