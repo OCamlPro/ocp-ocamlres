@@ -150,8 +150,9 @@ module Res (SF : SubFormat) (O : ResOptions) = struct
         let out = column (fun col -> SF.pprint col (O.width ()) p d) in
         (match SF.pprint_header p d with None -> () | Some p -> hd := p :: !hd) ;
         (match SF.pprint_footer p d with None -> () | Some p -> ft := p :: !ft) ;
+        let cstr_name = SF.name p d in
         group (!^"File (\"" ^^ !^name ^^ !^"\","
-               ^^ nest 2 (break 1 ^^ !^(cstr name) ^^ out ^^ !^")"))
+               ^^ nest 2 (break 1 ^^ !^(cstr cstr_name) ^^ out ^^ !^")"))
     in
     let items = (separate_map (!^" ;" ^^ break 1) (output []) root) in
     let body =

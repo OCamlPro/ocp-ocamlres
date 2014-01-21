@@ -148,14 +148,14 @@ module PredefOptions = struct
       "\"file name\"&print in a file instead of stdout"]
 end
 
-(** OCaml output subformat dispatching the output depending on file
+(** Output subformat dispatching the output depending on file
     extensions and the command line options. Outputs an OCaml value,
     naked or boxed in a constructor depending on a flag set by the
     Format before pprinting the tree. To be polymorphic, the [t] type
     is a string containing the raw resource representation, and the
     [from_raw] method of the selected subformat is used at every
     operation. *)
-module OCamlPredefSubFormat = struct
+module ExtensionDispatcherSubFormat = struct
   (** How the pprinted value is wrapped (not at all, or in a sum type
       constructor / variant constructor whose name is the one of the
       selected subformat). *)
@@ -203,11 +203,11 @@ module OCaml = struct
     let width () = !PredefOptions.width
     let out_channel () = !chan
   end
-  include OCamlResFormats.OCaml (OCamlPredefSubFormat) (Options)
+  include OCamlResFormats.OCaml (ExtensionDispatcherSubFormat) (Options)
   let options = PredefOptions.options
   let info = "produces static ocaml bindings (modules for dirs, values for files)"
   let output root =
-    OCamlPredefSubFormat.(box := Naked) ;
+    ExtensionDispatcherSubFormat.(box := Naked) ;
     match !PredefOptions.output_file with
     | None -> output root
     | Some fn ->
@@ -226,14 +226,14 @@ module Res = struct
     let use_variants () = !use_variants
     let out_channel () = !chan
   end
-  include OCamlResFormats.Res (OCamlPredefSubFormat) (Options)
+  include OCamlResFormats.Res (ExtensionDispatcherSubFormat) (Options)
   let options =
     PredefOptions.options
     @ [ "-no-variants", Arg.Clear use_variants,
         "use a plain sum type instead of polymorphic variants" ;]
   let info = "produces the OCaml source representation of the OCamlRes tree"
   let output root =
-    OCamlPredefSubFormat.(box := (if !use_variants then Variant else Sum)) ;
+    ExtensionDispatcherSubFormat.(box := (if !use_variants then Variant else Sum)) ;
     match !PredefOptions.output_file with
     | None -> output root
     | Some fn ->
@@ -244,7 +244,7 @@ module Res = struct
 end
 
 (** Instance of the Files format *)
-module Files = OCamlResFormats.Files (OCamlPredefSubFormat)
+module Files = OCamlResFormats.Files (ExtensionDispatcherSubFormat)
 
 let _ =
   register_format "ocaml" (module OCaml : Format) ;
