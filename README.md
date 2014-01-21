@@ -97,6 +97,7 @@ module B = struct
 end
 ```
 
+Mixing this feature with the `ocamlres` formqt is q bit trickier.
 Since the `'a root` type must be homogeneous, just using different
 subformat for pretty printing different leaves would produce untypable
 code. To solve this, the `ocamlres` format has two ways of working:
@@ -135,7 +136,7 @@ Some use-cases:
    he includes its config files.
  * Jeanine is an indie game developper and she uses the tool to be
    sure at compile time that she never forgets some asset. She uses
-   the "ocaml" backend and using OCaml identifiers to identify her
+   the "ocaml" backend and then simple OCaml identifiers to identify her
    resources.
  * Henry wants to build a single-binary installer, so he includes all
    the files as an ocamlres tree using the "ocamlres", format. Then he
