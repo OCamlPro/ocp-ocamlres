@@ -75,7 +75,7 @@ module B = struct
 end
 ```
 
-An more advanced feature is resource pre-parsing via subformats. While
+A more advanced feature is resource pre-parsing via subformats. While
 formats handle the generation of the main tree structure, subfornats
 handle the pretty printing of files. The tool has an option to select
 files by extension for applying a specific subformat to them. For
@@ -137,7 +137,7 @@ Some use-cases:
    sure at compile time that she never forgets some asset. She uses
    the "ocaml" backend and using OCaml identifiers to identify her
    resources.
- * Henry Wants to build a single-binary installer, so he includes all
+ * Henry wants to build a single-binary installer, so he includes all
    the files as an ocamlres tree using the "ocamlres", format. Then he
    links the generated module with the ocamlres lib, and calls the
    "files" output backend at run-time to extract the files.
