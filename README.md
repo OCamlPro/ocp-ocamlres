@@ -97,7 +97,7 @@ module B = struct
 end
 ```
 
-Mixing this feature with the `ocamlres` formqt is q bit trickier.
+Mixing this feature with the `ocamlres` format is a bit trickier.
 Since the `'a root` type must be homogeneous, just using different
 subformat for pretty printing different leaves would produce untypable
 code. To solve this, the `ocamlres` format has two ways of working:
