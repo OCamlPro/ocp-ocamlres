@@ -113,6 +113,7 @@ let main () =
     "-plug", Arg.String preload_module,
     "\"plugin.cmxs\"&load a plug-in" ;
     "-version", Arg.Unit version,
+    "display the version string" ;
     "-list", Arg.Unit list_formats,
     "print the list of available formats" ;
     "-list-subformats", Arg.Unit list_subformats,
