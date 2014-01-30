@@ -85,6 +85,11 @@ let list_subformats () =
     (subformats ()) ;
   exit 0
 
+(** Prints the version number *)
+let version () =
+  Printf.printf "0.1\n" ;
+  exit 0
+
 (** Parse the preload arguments, scan and filter the files, select the
     output backend and pass the control to it. *)
 let main () =
@@ -107,6 +112,7 @@ let main () =
   main_args := [
     "-plug", Arg.String preload_module,
     "\"plugin.cmxs\"&load a plug-in" ;
+    "-version", Arg.Unit version,
     "-list", Arg.Unit list_formats,
     "print the list of available formats" ;
     "-list-subformats", Arg.Unit list_subformats,
