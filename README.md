@@ -1,4 +1,4 @@
-`ocp-ocamlres` is a tool to embed files and directories inside an
+A tool `ocp-ocamlres` to embed files and directories inside an
 OCaml executables, with a companion library `ocplib-ocamlres` to
 manipulate them at run-time.
 

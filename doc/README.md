@@ -5,6 +5,18 @@ A tool `ocp-ocamlres` to embed files and directories inside an OCaml
 executables, with a companion library `ocplib-ocamlres` to manipulate
 them at run-time.
 
+Both are released under the terms of the GNU Lesser General
+Public License as published by the Free Software Foundation; either
+version 3.0 of the License, or (at your option) any later version.
+
+Install:
+--------
+
+ - Via OPAM (preferred): `opam install ocp-ocamlres`
+ - Manually: you will need to install the `pprint` library and then
+   type `make` and then `make install` or alternatively `make install
+   BINDIR="/path/to/bin" LIBDIR="/path/to/lib/ocaml"`.
+
 Features:
 ---------
   - Multi-format architecture enabling to embed the resource files in

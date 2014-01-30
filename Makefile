@@ -1,4 +1,5 @@
 BINDIR ?= $(dir $(shell which ocamlfind))
+LIBDIR ?= $(dir $(shell ocamlfind printconf destdir))
 PACKAGES=unix,str,pprint,dynlink
 .PHONY: all clean build
 
@@ -56,7 +57,7 @@ build/oCamlResMain.cmx: build/ocplib-ocamlres.cmxa
 build/oCamlResMain.cmo: build/ocplib-ocamlres.cma
 
 install:
-	ocamlfind install ocplib-ocamlres \
+	ocamlfind install -destdir $(LIBDIR) ocplib-ocamlres \
           build/META \
           build/ocplib-ocamlres.cma \
           build/ocplib-ocamlres.cmxa \
@@ -65,7 +66,7 @@ install:
 	install build/ocp-ocamlres.byte $(BINDIR)/ocp-ocamlres.byte
 
 uninstall:
-	ocamlfind remove ocplib-ocamlres
+	ocamlfind remove -destdir $(LIBDIR) ocplib-ocamlres
 	rm $(BINDIR)/ocp-ocamlres
 	rm $(BINDIR)/ocp-ocamlres.byte
 
