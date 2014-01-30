@@ -15,7 +15,9 @@ Install:
  - Via OPAM (preferred): `opam install ocp-ocamlres`
  - Manually: you will need to install the `pprint` library and then
    type `make` and then `make install` or alternatively `make install
-   BINDIR="/path/to/bin" LIBDIR="/path/to/lib/ocaml"`.
+   BINDIR="/path/to/bin" LIBDIR="/path/to/lib/ocaml"`. You can also
+   build the documentation using `make doc` and then `make
+   DOCDIR=/path/to/doc install-doc` if you want.
 
 Features:
 ---------
