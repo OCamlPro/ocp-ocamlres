@@ -1,40 +1,73 @@
+BINDIR ?= $(dir $(shell which ocamlfind))
 PACKAGES=unix,str,pprint,dynlink
-.PHONY: all clean
+.PHONY: all clean build
 
-all: ocp-ocamlres.byte ocp-ocamlres.asm
+all: \
+  build/ocplib-ocamlres.cma \
+  build/ocplib-ocamlres.cmxa \
+  build/ocplib-ocamlres.cmxs \
+  build/ocp-ocamlres.byte \
+  build/ocp-ocamlres.asm \
+  build/META
 
-ocp-ocamlres.byte: ocplib-ocamlres.cma oCamlResMain.cmo
-	ocamlfind ocamlc -g -package $(PACKAGES) -linkpkg -o $@ $^
+build/ocp-ocamlres.byte: build/ocplib-ocamlres.cma build/oCamlResMain.cmo
+	ocamlfind ocamlc -I build -g -package $(PACKAGES) -linkpkg -o $@ $^
 
-ocp-ocamlres.asm: ocplib-ocamlres.cmxa oCamlResMain.cmx
-	ocamlfind ocamlopt -g -package $(PACKAGES) -linkpkg -o $@ $^
+build/ocp-ocamlres.asm: build/ocplib-ocamlres.cmxa build/oCamlResMain.cmx
+	ocamlfind ocamlopt -I build -g -package $(PACKAGES) -linkpkg -o $@ $^
 
-%.cmo: %.ml
-	ocamlfind ocamlc -g -c -package $(PACKAGES) $<
+build/%.cmo: build/%.ml
+	ocamlfind ocamlc -I build -g -c -package $(PACKAGES) $<
 
-%.cmx: %.ml
-	ocamlfind ocamlopt -g -c -package $(PACKAGES) $<
+build/%.cmx: build/%.ml
+	ocamlfind ocamlopt -I build -g -c -package $(PACKAGES) $<
 
-ocplib-ocamlres.cma: \
-  oCamlRes.cmo \
-  oCamlResSubFormats.cmo oCamlResFormats.cmo \
-  oCamlResRegistry.cmo
+build/%: src/% | build
+	cp $< $(patsubst src/%, build/%, $<)
+
+build:
+	@if ! test -d build ; then mkdir build ; echo "mkdir build" ; fi
+
+build/ocplib-ocamlres.cma: \
+  build/oCamlRes.cmo \
+  build/oCamlResSubFormats.cmo build/oCamlResFormats.cmo \
+  build/oCamlResRegistry.cmo
 	ocamlfind ocamlc -a -package $(PACKAGES) $^ -o $@
 
-ocplib-ocamlres.cmxa: \
-  oCamlRes.cmx \
-  oCamlResSubFormats.cmx oCamlResFormats.cmx \
-  oCamlResRegistry.cmx
+build/ocplib-ocamlres.cmxa: \
+  build/oCamlRes.cmx \
+  build/oCamlResSubFormats.cmx build/oCamlResFormats.cmx \
+  build/oCamlResRegistry.cmx
 	ocamlfind ocamlopt -a -package $(PACKAGES) $^ -o $@
 
-oCamlResRegistry.cmx: oCamlResFormats.cmx
-oCamlResRegistry.cmo: oCamlResFormats.cmo
+build/ocplib-ocamlres.cmxs: \
+  build/oCamlRes.cmx \
+  build/oCamlResSubFormats.cmx build/oCamlResFormats.cmx \
+  build/oCamlResRegistry.cmx
+	ocamlfind ocamlopt -shared -package $(PACKAGES) $^ -o $@
 
-oCamlResFormats.cmx: oCamlResSubFormats.cmx oCamlRes.cmx
-oCamlResFormats.cmo: oCamlResSubFormats.cmo oCamlRes.cmo
+build/oCamlResRegistry.cmx: build/oCamlResFormats.cmx
+build/oCamlResRegistry.cmo: build/oCamlResFormats.cmo
 
-oCamlResMain.cmx: ocplib-ocamlres.cmxa
-oCamlResMain.cmo: ocplib-ocamlres.cma
+build/oCamlResFormats.cmx: build/oCamlResSubFormats.cmx build/oCamlRes.cmx
+build/oCamlResFormats.cmo: build/oCamlResSubFormats.cmo build/oCamlRes.cmo
+
+build/oCamlResMain.cmx: build/ocplib-ocamlres.cmxa
+build/oCamlResMain.cmo: build/ocplib-ocamlres.cma
+
+install:
+	ocamlfind install ocplib-ocamlres \
+          build/META \
+          build/ocplib-ocamlres.cma \
+          build/ocplib-ocamlres.cmxa \
+          build/ocplib-ocamlres.cmxs
+	install build/ocp-ocamlres.asm $(BINDIR)/ocp-ocamlres
+	install build/ocp-ocamlres.byte $(BINDIR)/ocp-ocamlres.byte
+
+uninstall:
+	ocamlfind remove ocplib-ocamlres
+	rm $(BINDIR)/ocp-ocamlres
+	rm $(BINDIR)/ocp-ocamlres.byte
 
 clean:
-	$(RM) -f *.old *~ *.cm* *.o *.a *.dll *.so *.dylib *.byte *.asm
+	$(RM) -rf *.old *~ */*~ build

@@ -1,9 +1,9 @@
 begin library "ocplib-ocamlres"
       files = [
-      	    "oCamlRes.ml"
-      	    "oCamlResSubFormats.ml"
-      	    "oCamlResFormats.ml"
-      	    "oCamlResRegistry.ml"
+      	    "src/oCamlRes.ml"
+      	    "src/oCamlResSubFormats.ml"
+      	    "src/oCamlResFormats.ml"
+      	    "src/oCamlResRegistry.ml"
       ]
       requires = [ "str" "unix" "dynlink" "pprint" ]
       asmcomp = [ "-g" ]
@@ -11,7 +11,7 @@ end
 
 begin program "ocp-ocamlres"
       files = [
-      	    "oCamlResMain.ml"
+      	    "src/oCamlResMain.ml"
       ]
       requires = [ "ocplib-ocamlres" ]
       asmcomp = [ "-g" ]

@@ -1,0 +1,8 @@
+version = "0.1"
+description = "Manipulation, injection and extraction of embedded resources"
+
+archive(byte) = "ocplib-ocamlres.cma"
+archive(byte, plugin) = "ocplib-ocamlres.cma"
+archive(native) = "ocplib-ocamlres.cmxa"
+archive(native, plugin) = "ocplib-ocamlres.cmxs"
+exists_if = "ocplib-ocamlres.cma"
