@@ -31,7 +31,7 @@ LIB_CMX = $(patsubst src/%.ml, build/%.cmx, $(LIB_ML))
 doc: all src/*.ml
 	ocamlfind ocamldoc -I build  -package $(PACKAGES) \
           -html -d doc \
-	  $(LIB_SOURCES)
+	  $(LIB_ML)
 
 build/ocp-ocamlres.byte: build/ocplib-ocamlres.cma $(BIN_CMO)
 	ocamlfind ocamlc -I build -g -package $(PACKAGES) -linkpkg -o $@ $^
@@ -64,6 +64,9 @@ build/ocplib-ocamlres.cmxs: $(LIB_CMX)
 .depend:
 	ocamlfind ocamldep -I src -package $(PACKAGES) $(LIB_ML) > $@
 	sed -i s/src/build/g $@
+
+$(BIN_CMO): build/ocplib-ocamlres.cma
+$(BIN_CMX): build/ocplib-ocamlres.cmxa
 
 install: all
 	ocamlfind install -destdir $(LIBDIR) ocplib-ocamlres \

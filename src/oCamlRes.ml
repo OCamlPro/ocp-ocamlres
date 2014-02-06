@@ -180,7 +180,7 @@ module Res = struct
     snd (List.split (SM.bindings !files))
     @ List.map (fun msg -> Error msg) (SS.elements !errors )
 
-  (** Find a resource from its path. *)
+  (** Find a resource from its path or raise [Not_found]. *)
   let rec find (path : Path.t) (root : 'a root) : 'a =
     match root, path with
     | File (name, data) :: ns, ([d], None) -> (* let's be flexible *)
@@ -193,7 +193,7 @@ module Res = struct
       find path ps
     | _, _ -> raise Not_found
 
-  (** Find a directory (as a root) from its path. *)
+  (** Find a directory (as a root) from its path or raise [Not_found]. *)
   let rec find_dir (path : Path.t) (root : 'a root) : 'a root =
     match root, path with
     | _, ([], None) -> root

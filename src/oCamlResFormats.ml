@@ -12,6 +12,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  *
  * See the LICENSE file for more details *)
+
+(** Formatters for the main resource tree structure *)
  
 open OCamlRes.Path
 open OCamlRes.Res
@@ -21,18 +23,15 @@ open PPrint
 (** Format modules essentially wrap an output function which takes a
     resource tree as input and produces an output. *)
 module type Format = sig
-  (** The type of leaves in the resource tree *)
-  type t
-  (** Pretty print a resource store to a PPrint document *)
-  val output : t root -> unit
-end
 
-(** Options for the {!OCaml} format. *)
-module type OCamlOptions = sig
-  (** Maximum line width *)
-  val width : unit -> int
-  (** Specify the output *)
-  val out_channel : unit -> out_channel
+  (** The type of leaves in the resource tree *)
+  type data
+
+  (** Parameters to the output function *)
+  type params
+
+  (** Pretty print a resource store to a PPrint document *)
+  val output : params -> data root -> unit
 end
 
 (** This format produces OCaml source code with OCaml submodules for
@@ -40,8 +39,12 @@ end
     parametric in the type of leaves and the pretty printing
     function. It is used by the command line tool as instanciated in
     {!OCamlResRegistry}. *)
-module OCaml (SF : SubFormat) (O : OCamlOptions) = struct
-  type t = SF.t
+module OCaml (SF : SubFormat) = struct
+  type data = SF.t
+  type params = {
+    width : int (** Maximum line width *) ;
+    out_channel : out_channel (** Specify the output *)
+  }
 
   let esc name =
     let res = String.copy name in
@@ -68,7 +71,7 @@ module OCaml (SF : SubFormat) (O : OCamlOptions) = struct
       | 'a'..'z' -> String.capitalize res
       | _ -> res
 
-  let output root =
+  let output params root =
     let hd = ref [] and ft = ref [] in
     let rec output dirs node =
       match node with
@@ -81,7 +84,7 @@ module OCaml (SF : SubFormat) (O : OCamlOptions) = struct
                ^^ break 1 ^^ !^"end")
       | File (name, d) ->
         let p = (List.rev dirs, Some (split_ext name)) in
-        let out = column (fun col -> SF.pprint col (O.width ()) p d) in
+        let out = column (fun col -> SF.pprint col params.width p d) in
         (match SF.pprint_header p d with None -> () | Some p -> hd := p :: !hd) ;
         (match SF.pprint_footer p d with None -> () | Some p -> ft := p :: !ft) ;
         group (!^"let " ^^ !^(esc_name name) ^^ !^" =" ^^ nest 2 (break 1 ^^ out))
@@ -89,26 +92,21 @@ module OCaml (SF : SubFormat) (O : OCamlOptions) = struct
     in
     let defs = List.map (fun node -> output [] node) root in
     let res = separate hardline (List.rev !hd @ defs @ List.rev !ft) in
-    PPrint.ToChannel.pretty 0.8 80 (O.out_channel ()) (res ^^ hardline)
-end
-
-(** Options for the {!Res} format. *)
-module type ResOptions = sig
-  (** Maximum line width *)
-  val width : unit -> int
-  (** Produce a sum type or use polymorphic variants *)
-  val use_variants : unit -> bool
-  (** Specify the output *)
-  val out_channel : unit -> out_channel
+    PPrint.ToChannel.pretty 0.8 80 params.out_channel (res ^^ hardline)
 end
 
 (** Produces OCaml source contaiming a single [root] value which
     contains an OCamlRes tree to be used at runtime through the
     OCamlRes module. *)
-module Res (SF : SubFormat) (O : ResOptions) = struct
+module Res (SF : SubFormat) = struct
   type t = SF.t
+  type params = {
+    width : int (** Maximum line width *) ;
+    out_channel : out_channel (** Specify the output *) ;
+    use_variants : bool (** Produce a sum type or use polymorphic variants *)
+  }
 
-  let output root =
+  let output params root =
     let hd = ref [] and ft = ref [] in
     let box =
       let rec collect dirs acc = function
@@ -122,7 +120,7 @@ module Res (SF : SubFormat) (O : ResOptions) = struct
       match SM.bindings (List.fold_left (collect []) SM.empty root) with
       | [] | [ _ ] -> false
       | l ->
-        if not (O.use_variants ()) then begin
+        if not params.use_variants then begin
           let cases =
             separate_map hardline
               (fun (c, t) ->
@@ -133,7 +131,7 @@ module Res (SF : SubFormat) (O : ResOptions) = struct
     in
     let cstr ext =
       if not box then ""
-      else (if O.use_variants () then "`" else "") ^ String.capitalize ext ^ " "
+      else (if params.use_variants then "`" else "") ^ String.capitalize ext ^ " "
     in
     let rec output dirs node =
       match node with
@@ -146,7 +144,7 @@ module Res (SF : SubFormat) (O : ResOptions) = struct
                ^^ !^"])")
       | File (name, d) ->
         let p = (List.rev dirs, Some (split_ext name)) in
-        let out = column (fun col -> SF.pprint col (O.width ()) p d) in
+        let out = column (fun col -> SF.pprint col params.width p d) in
         (match SF.pprint_header p d with None -> () | Some p -> hd := p :: !hd) ;
         (match SF.pprint_footer p d with None -> () | Some p -> ft := p :: !ft) ;
         let cstr_name = SF.name p d in
@@ -159,41 +157,37 @@ module Res (SF : SubFormat) (O : ResOptions) = struct
       ^^ break 1 ^^ !^"])"
     in
     let res = separate hardline (List.rev (!ft @ [ body ] @ !hd)) in
-    PPrint.ToChannel.pretty 0.8 80 (O.out_channel ()) (res ^^ hardline)
+    PPrint.ToChannel.pretty 0.8 80 params.out_channel (res ^^ hardline)
 end
 
 (** Reproduces the original scanned files (or creates new ones in case
     of a forged resource store). *)
 module Files (SF : SubFormat) = struct
   type t = SF.t
+  type params = {
+    base_output_dir : string ;
+  }
 
-  let base_output_dir = ref "."
-
-  let output root =
+  let output params root =
     let rec output dirs node =
       match node with
       | Error msg ->
         Printf.eprintf "Error: %s\n%!" msg
       | Dir (d, nodes) ->
         let p = (List.rev dirs, Some (d, None)) in
-        let fspath = !base_output_dir ^ OCamlRes.Path.to_string p in
+        let fspath = params.base_output_dir ^ OCamlRes.Path.to_string p in
         Unix.handle_unix_error (Unix.mkdir fspath) 0o750 ;
         List.iter (output (d :: dirs)) nodes ;
       | File (name, data) ->
         let p = (List.rev dirs, Some (split_ext name)) in
-        let fspath = !base_output_dir ^ OCamlRes.Path.to_string p in
+        let fspath = params.base_output_dir ^ OCamlRes.Path.to_string p in
         let chan = open_out_bin fspath in
         output_string chan (SF.to_raw p data) ;
         close_out chan
     in
-    if not (Sys.file_exists !base_output_dir) then
-      Unix.handle_unix_error (Unix.mkdir !base_output_dir) 0o750 ;
+    if not (Sys.file_exists params.base_output_dir) then
+      Unix.handle_unix_error (Unix.mkdir params.base_output_dir) 0o750 ;
     List.iter
       (fun node -> output [] node)
       root
-
-  let info = "reproduces the original files"
-  let options = [
-    "-output-dir", Arg.Set_string base_output_dir,
-    "\"dir\"&set the base output directory (defaults to \".\")"]
 end
