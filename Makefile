@@ -15,18 +15,28 @@ all: \
   build/ocp-ocamlres.asm \
   build/META
 
+LIB_ML= \
+  src/oCamlRes.ml \
+  src/oCamlResScanners.ml \
+  src/oCamlResSubFormats.ml \
+  src/oCamlResFormats.ml \
+  src/oCamlResRegistry.ml
+BIN_ML= \
+  src/oCamlResMain.ml
+BIN_CMO = $(patsubst src/%.ml, build/%.cmo, $(BIN_ML))
+LIB_CMO = $(patsubst src/%.ml, build/%.cmo, $(LIB_ML))
+BIN_CMX = $(patsubst src/%.ml, build/%.cmx, $(BIN_ML))
+LIB_CMX = $(patsubst src/%.ml, build/%.cmx, $(LIB_ML))
+
 doc: all src/*.ml
 	ocamlfind ocamldoc -I build  -package $(PACKAGES) \
           -html -d doc \
-          src/oCamlRes.ml \
-          src/oCamlResSubFormats.ml src/oCamlResFormats.ml \
-          src/oCamlResRegistry.ml
+	  $(LIB_SOURCES)
 
-
-build/ocp-ocamlres.byte: build/ocplib-ocamlres.cma build/oCamlResMain.cmo
+build/ocp-ocamlres.byte: build/ocplib-ocamlres.cma $(BIN_CMO)
 	ocamlfind ocamlc -I build -g -package $(PACKAGES) -linkpkg -o $@ $^
 
-build/ocp-ocamlres.asm: build/ocplib-ocamlres.cmxa build/oCamlResMain.cmx
+build/ocp-ocamlres.asm: build/ocplib-ocamlres.cmxa $(BIN_CMX)
 	ocamlfind ocamlopt -I build -g -package $(PACKAGES) -linkpkg -o $@ $^
 
 build/%.cmo: build/%.ml
@@ -41,32 +51,19 @@ build/%: src/% | build
 build:
 	@if ! test -d build ; then mkdir build ; echo "mkdir build" ; fi
 
-build/ocplib-ocamlres.cma: \
-  build/oCamlRes.cmo \
-  build/oCamlResSubFormats.cmo build/oCamlResFormats.cmo \
-  build/oCamlResRegistry.cmo
+build/ocplib-ocamlres.cma: $(LIB_CMO)
 	ocamlfind ocamlc -a -package $(PACKAGES) $^ -o $@
 
-build/ocplib-ocamlres.cmxa: \
-  build/oCamlRes.cmx \
-  build/oCamlResSubFormats.cmx build/oCamlResFormats.cmx \
-  build/oCamlResRegistry.cmx
+build/ocplib-ocamlres.cmxa: $(LIB_CMX)
 	ocamlfind ocamlopt -a -package $(PACKAGES) $^ -o $@
 
-build/ocplib-ocamlres.cmxs: \
-  build/oCamlRes.cmx \
-  build/oCamlResSubFormats.cmx build/oCamlResFormats.cmx \
-  build/oCamlResRegistry.cmx
+build/ocplib-ocamlres.cmxs: $(LIB_CMX)
 	ocamlfind ocamlopt -shared -package $(PACKAGES) $^ -o $@
 
-build/oCamlResRegistry.cmx: build/oCamlResFormats.cmx
-build/oCamlResRegistry.cmo: build/oCamlResFormats.cmo
-
-build/oCamlResFormats.cmx: build/oCamlResSubFormats.cmx build/oCamlRes.cmx
-build/oCamlResFormats.cmo: build/oCamlResSubFormats.cmo build/oCamlRes.cmo
-
-build/oCamlResMain.cmx: build/ocplib-ocamlres.cmxa
-build/oCamlResMain.cmo: build/ocplib-ocamlres.cma
+-include .depend
+.depend:
+	ocamlfind ocamldep -I src -package $(PACKAGES) $(LIB_ML) > $@
+	sed -i s/src/build/g $@
 
 install: all
 	ocamlfind install -destdir $(LIBDIR) ocplib-ocamlres \
@@ -88,4 +85,4 @@ uninstall-doc:
 	$(RM) -rf $(DOCDIR)/ocp-ocamlres
 
 clean:
-	$(RM) -rf *.old *~ */*~ build doc/*.html doc/style.css
+	$(RM) -rf *.old *~ */*~ build doc/*.html doc/style.css .depend

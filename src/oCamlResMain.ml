@@ -130,16 +130,18 @@ let main () =
    | Arg.Bad opt ->
      Printf.printf "Unrecognized option %S\n" opt ; help !main_args usage
    | Arg.Help _ -> help !main_args usage) ;
+  let open OCamlRes in
+  let open OCamlResScanners in
   let prefilter =
-    OCamlRes.PathFilter.(if !exts = [] then any else has_extension !exts)
+    PathFilter.(if !exts = [] then any else has_extension !exts)
   in
   let postfilter =
-    OCamlRes.ResFilter.(if !skip_empty_dirs then exclude empty_dir else any)
+    ResFilter.(if !skip_empty_dirs then exclude empty_dir else any)
   in
   let module F = (val !format) in
   let root =
     List.fold_left
-      (fun r d -> OCamlRes.(Res.merge r (scan ~prefilter ~postfilter d)))
+      (fun r d -> Res.merge r (scan ~prefilter ~postfilter d))
       [] !files
   in
   F.output root
