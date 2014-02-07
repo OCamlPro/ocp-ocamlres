@@ -109,6 +109,7 @@ module Res (SF : SubFormat) = struct
   let output params root =
     let hd = ref [] and ft = ref [] in
     let box =
+      let module SM = Map.Make (String) in
       let rec collect dirs acc = function
         | Dir (d, nodes) ->
           List.fold_left (collect (d :: dirs)) acc nodes

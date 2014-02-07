@@ -7,14 +7,6 @@ PACKAGES=unix,str,pprint,dynlink
    install uninstall \
    doc install-doc uninstall-doc
 
-all: \
-  build/ocplib-ocamlres.cma \
-  build/ocplib-ocamlres.cmxa \
-  build/ocplib-ocamlres.cmxs \
-  build/ocp-ocamlres.byte \
-  build/ocp-ocamlres.asm \
-  build/META
-
 LIB_ML= \
   src/oCamlRes.ml \
   src/oCamlResScanners.ml \
@@ -23,15 +15,33 @@ LIB_ML= \
   src/oCamlResRegistry.ml
 BIN_ML= \
   src/oCamlResMain.ml
+LIB_MLI= \
+  src/oCamlRes.mli
+BIN_ML=
 BIN_CMO = $(patsubst src/%.ml, build/%.cmo, $(BIN_ML))
-LIB_CMO = $(patsubst src/%.ml, build/%.cmo, $(LIB_ML))
 BIN_CMX = $(patsubst src/%.ml, build/%.cmx, $(BIN_ML))
+BIN_CMT = $(patsubst src/%.ml, build/%.cmt, $(BIN_ML))
+BIN_CMI = $(patsubst src/%.mli, build/%.cmi, $(BIN_MLI))
+BIN_CMTI = $(patsubst src/%.mli, build/%.cmti, $(BIN_MLI))
+LIB_CMO = $(patsubst src/%.ml, build/%.cmo, $(LIB_ML))
 LIB_CMX = $(patsubst src/%.ml, build/%.cmx, $(LIB_ML))
+LIB_CMT = $(patsubst src/%.ml, build/%.cmt, $(LIB_ML))
+LIB_CMI = $(patsubst src/%.mli, build/%.cmi, $(LIB_MLI))
+LIB_CMTI = $(patsubst src/%.mli, build/%.cmti, $(LIB_MLI))
 
-doc: all src/*.ml
+all: \
+  build/ocplib-ocamlres.cma \
+  build/ocplib-ocamlres.cmxa \
+  build/ocplib-ocamlres.cmxs \
+  build/ocp-ocamlres.byte \
+  build/ocp-ocamlres.asm \
+  build/META \
+  $(LIB_CMTI) $(LIB_CMT)
+
+doc: all $(LIB_MLI)
 	ocamlfind ocamldoc -I build  -package $(PACKAGES) \
           -html -d doc \
-	  $(LIB_ML)
+	  $(LIB_MLI)
 
 build/ocp-ocamlres.byte: build/ocplib-ocamlres.cma $(BIN_CMO)
 	ocamlfind ocamlc -I build -g -package $(PACKAGES) -linkpkg -o $@ $^
@@ -39,10 +49,13 @@ build/ocp-ocamlres.byte: build/ocplib-ocamlres.cma $(BIN_CMO)
 build/ocp-ocamlres.asm: build/ocplib-ocamlres.cmxa $(BIN_CMX)
 	ocamlfind ocamlopt -I build -g -package $(PACKAGES) -linkpkg -o $@ $^
 
-build/%.cmo: build/%.ml
-	ocamlfind ocamlc -I build -g -c -package $(PACKAGES) $<
+%.cmo %.cmt: %.ml
+	ocamlfind ocamlc -I build -g -bin-annot -c -package $(PACKAGES) $<
 
-build/%.cmx: build/%.ml
+%.cmi %.cmti: %.mli
+	ocamlfind ocamlc -I build -g -bin-annot -c -package $(PACKAGES) $<
+
+%.cmx: %.ml
 	ocamlfind ocamlopt -I build -g -c -package $(PACKAGES) $<
 
 build/%: src/% | build
@@ -71,7 +84,8 @@ $(BIN_CMX): build/ocplib-ocamlres.cmxa
 install: all
 	ocamlfind install -destdir $(LIBDIR) ocplib-ocamlres \
           build/META \
-          build/*ocplib-ocamlres.*
+          build/*ocplib-ocamlres.* \
+	  $(LIB_CMI) $(LIB_CMTI) $(LIB_CMT) $(LIB_MLI)
 	install build/ocp-ocamlres.asm $(BINDIR)/ocp-ocamlres
 	install build/ocp-ocamlres.byte $(BINDIR)/ocp-ocamlres.byte
 
