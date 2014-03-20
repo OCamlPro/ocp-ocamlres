@@ -167,9 +167,9 @@ module ExtensionDispatcherSubFormat = struct
   let from_raw path data = data
   let to_raw path data = data
 
-  let pprint col max path data =
+  let pprint path data =
     let module SF = (val find_subformat path) in
-    SF.pprint col !PredefOptions.width path (SF.from_raw path data)
+    SF.pprint path (SF.from_raw path data)
   let pprint_header path data =
     let module SF = (val find_subformat path) in
     SF.pprint_footer path (SF.from_raw path data)

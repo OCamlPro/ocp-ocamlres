@@ -17,7 +17,7 @@ BIN_ML= \
   src/oCamlResMain.ml
 LIB_MLI= \
   src/oCamlRes.mli
-BIN_ML=
+
 BIN_CMO = $(patsubst src/%.ml, build/%.cmo, $(BIN_ML))
 BIN_CMX = $(patsubst src/%.ml, build/%.cmx, $(BIN_ML))
 BIN_CMT = $(patsubst src/%.ml, build/%.cmt, $(BIN_ML))
