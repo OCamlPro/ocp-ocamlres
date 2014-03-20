@@ -42,10 +42,10 @@ module type SubFormat = sig
       resources. *)
   val to_raw : OCamlRes.Path.t -> t -> string
 
-  (** Takes the current column, the expected line width, the path to
-      the resource in the resource tree, and its value to pretty
-      print. Returns the OCaml representation of the value. *)
-  val pprint : int -> int -> OCamlRes.Path.t -> t -> PPrint.document
+  (** Takes the path to the resource in the resource tree, and its
+      value to pretty print. Returns the OCaml representation of the
+      value. *)
+  val pprint : OCamlRes.Path.t -> t -> PPrint.document
 
   (** Provides an optional piece of OCaml code to put before the
       resource store definition, for instance a type definition. *)
@@ -76,7 +76,7 @@ module Int = struct
   let from_raw _ str = Scanf.sscanf str "%i" (fun i -> i)
   let to_raw _ i = Printf.sprintf "%i" i
 
-  let pprint col width _ i = PPrint.OCaml.int i
+  let pprint _ i = PPrint.OCaml.int i
   let pprint_header _ _ = None
   let pprint_footer _ _ = None
 
@@ -93,7 +93,7 @@ module Raw = struct
 
   (** Splits a string into a flow of escaped characters. Respects
       the original line feeds if it ressembles a text file. *)
-  let pprint col width path data =
+  let pprint path data =
     let open PPrint in
     let len = String.length data in
     let looks_like_text =
@@ -110,70 +110,58 @@ module Raw = struct
     let  hexd = [| '0' ; '1' ; '2' ; '3' ; '4' ; '5' ; '6' ; '7' ;
                    '8' ; '9' ; 'A' ; 'B' ; 'C' ; 'D' ; 'E' ; 'F' |] in
     if not looks_like_text then
-      let cwidth = (width - col) / 4 in
-      let rec split acc ofs =
+(* (* less ugly, too costly *)
+      let rec blobs acc ofs w =
         if ofs >= len then List.rev acc
         else
-          let blen = min cwidth (len - ofs) in
-          let blob = String.create (blen * 4) in
-          for i = 0 to blen - 1 do
+          let len = (min w (len - ofs)) in 
+          let blob = String.create (len * 4) in
+          for i = 0 to len - 1 do
             let c = Char.code data.[ofs + i] in
             blob.[i * 4] <- '\\' ;
             blob.[i * 4 + 1] <- 'x' ;
             blob.[i * 4 + 2] <- (hexd.(c lsr 4)) ;
             blob.[i * 4 + 3] <- (hexd.(c land 15)) ;
           done ;
-          let blob = if ofs <> 0 then !^" " ^^ !^blob else !^blob in
-          split (blob :: acc) (ofs + blen)
+          blobs (!^blob :: acc) (ofs + w) w
       in
-      !^"\"" ^^ separate (!^"\\" ^^ hardline) (split [] 0) ^^ !^"\""
+      let blobs = blobs [] 0 20 in
+      group (!^"\"" ^^ align (separate (ifflat empty (!^"\\" ^^ hardline)) blobs) ^^ !^"\"")
+*)
+      group (!^"\"" ^^ !^(String.escaped data) ^^ !^"\"")
     else
-      let do_one_char cur next =
-        match cur, next with
-        | ' ', _ ->
-          group (ifflat !^" " (!^"\\" ^^ hardline ^^ !^"\\ "))
-        | '\r', '\n' ->
-          group (ifflat !^"\\r" (!^"\\" ^^ hardline ^^ !^" \\r"))
-        | '\r', ' ' ->
-          ifflat !^"\\r"
-            (group (ifflat !^"\\r" (!^"\\" ^^ hardline ^^ !^" \\r"))
-             ^^ !^"\\" ^^ hardline ^^ !^"\\")
-        | '\r', _ ->
-          ifflat !^"\\r"
-            (group (ifflat !^"\\r" (!^"\\" ^^ hardline ^^ !^" \\r"))
-             ^^ !^"\\" ^^ hardline ^^ !^" ")
-        | '\n', ' ' ->
-          ifflat !^"\\n"
-            (group (ifflat !^"\\n" (!^"\\" ^^ hardline ^^ !^" \\n"))
-             ^^ !^"\\" ^^ hardline ^^ !^"\\")
-        | '\n', _ ->
-          ifflat !^"\\n"
-            (group (ifflat !^"\\n" (!^"\\" ^^ hardline ^^ !^" \\n"))
-             ^^ !^"\\" ^^ hardline ^^ !^" ")
-        | '\t', _ ->
-          group (ifflat !^"\\t" (!^"\\" ^^ hardline ^^ !^" \\t"))
-        | '"', _ ->
-          group (ifflat !^"\\\"" (!^"\\" ^^ hardline ^^ !^" \\\""))
-        | '\\', _ ->
-          group (ifflat !^"\\\\" (!^"\\" ^^ hardline ^^ !^" \\\\"))
-        | c, _ ->
-          let fmt =
-            if Char.code c > 128 || Char.code c < 32 then
-              let c = Char.code c in
-              let s = String.create 4 in
-              s.[0] <- '\\' ; s.[1] <- 'x' ;
-              s.[2] <- (hexd.(c lsr 4)) ; s.[3] <- (hexd.(c land 15)) ;
-              s
-            else String.make 1 c
-          in
-          group (ifflat !^fmt (!^"\\" ^^ hardline ^^ !^" " ^^ !^fmt))
+      let chunk last i =
+        !^(String.sub data last (i - last))
       in
-      let res = ref empty in
-      for i = 0 to len - 2 do
-        res := !res ^^ do_one_char data.[i] data.[succ i]
-      done ;
-      if len > 0 then res := !res ^^ do_one_char data.[len - 1] '\000' ;
-      group (!^"\"" ^^ !res ^^ !^"\"")
+      let rec loop acc last i =
+        if i = len then acc else
+          match data.[i], data.[min (i + 1) (len - 1)] with
+          | '\r', '\n' ->
+            loop (acc ^^ chunk last i ^^ !^"\\r") (i + 1) (i + 1)
+          | '\r', ' ' ->
+            loop (acc ^^ chunk last i ^^ !^"\\r\\" ^^ hardline ^^ !^"\\") (i + 1) (i + 1)
+          | '\r', _ ->
+            loop (acc ^^ chunk last i ^^ !^"\\r\\" ^^ hardline ^^ !^" ") (i + 1) (i + 1)
+          | '\n', ' ' ->
+            loop (acc ^^ chunk last i ^^ !^"\\n\\" ^^ hardline ^^ !^"\\") (i + 1) (i + 1)
+          | '\n', _ ->
+            loop (acc ^^ chunk last i ^^ !^"\\n\\" ^^ hardline ^^ !^" ") (i + 1) (i + 1)
+          | '\t', _ ->
+            loop (acc ^^ chunk last i ^^ !^"\\t") (i + 1) (i + 1)
+          | '"', _ ->
+            loop (acc ^^ chunk last i ^^ !^"\\\"") (i + 1) (i + 1)
+          | '\\', _ ->
+            loop (acc ^^ chunk last i ^^ !^"\\\\") (i + 1) (i + 1)
+          | c, _ when Char.code c >= 128 || Char.code c < 32 ->
+            let c = Char.code c in
+            let s = String.create 4 in
+            s.[0] <- '\\' ; s.[1] <- 'x' ;
+            s.[2] <- (hexd.(c lsr 4)) ; s.[3] <- (hexd.(c land 15)) ;
+            loop (acc ^^ chunk last i ^^ !^s) (i + 1) (i + 1)
+          | c, _ when i = len - 1 -> acc ^^ chunk last (i + 1)
+          | c, _ -> loop acc last (i + 1)
+      in
+      group (align (!^"\"" ^^ loop empty 0 0 ^^ !^"\""))
   let pprint_header _ _ = None
   let pprint_footer _ _ = None
 
@@ -188,12 +176,12 @@ module Lines = struct
   let from_raw _ str = Str.split (Str.regexp "[\r\n]") str
   let to_raw _ lines = String.concat "\n" lines
 
-  let pprint col width path lns =
+  let pprint path lns =
     let open PPrint in
     let contents =
       separate_map
         (!^" ;" ^^ break 1)
-        (fun l -> column (fun col -> Raw.pprint col width path l))
+        (Raw.pprint path)
         lns
     in group (!^"[ " ^^ nest 2 contents ^^ !^" ]")
   let pprint_header _ _ = None

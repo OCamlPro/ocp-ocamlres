@@ -84,7 +84,7 @@ module OCaml (SF : SubFormat) = struct
                ^^ break 1 ^^ !^"end")
       | File (name, d) ->
         let p = (List.rev dirs, Some (split_ext name)) in
-        let out = column (fun col -> SF.pprint col params.width p d) in
+        let out = SF.pprint p d in
         (match SF.pprint_header p d with None -> () | Some p -> hd := p :: !hd) ;
         (match SF.pprint_footer p d with None -> () | Some p -> ft := p :: !ft) ;
         group (!^"let " ^^ !^(esc_name name) ^^ !^" =" ^^ nest 2 (break 1 ^^ out))
@@ -92,7 +92,7 @@ module OCaml (SF : SubFormat) = struct
     in
     let defs = List.map (fun node -> output [] node) root in
     let res = separate hardline (List.rev !hd @ defs @ List.rev !ft) in
-    PPrint.ToChannel.pretty 0.8 80 params.out_channel (res ^^ hardline)
+    PPrint.ToChannel.pretty 0.8 params.width params.out_channel (res ^^ hardline)
 end
 
 (** Produces OCaml source contaiming a single [root] value which
@@ -145,7 +145,7 @@ module Res (SF : SubFormat) = struct
                ^^ !^"])")
       | File (name, d) ->
         let p = (List.rev dirs, Some (split_ext name)) in
-        let out = column (fun col -> SF.pprint col params.width p d) in
+        let out = SF.pprint  p d in
         (match SF.pprint_header p d with None -> () | Some p -> hd := p :: !hd) ;
         (match SF.pprint_footer p d with None -> () | Some p -> ft := p :: !ft) ;
         let cstr_name = SF.name p d in
@@ -158,7 +158,7 @@ module Res (SF : SubFormat) = struct
       ^^ break 1 ^^ !^"])"
     in
     let res = separate hardline (List.rev (!ft @ [ body ] @ !hd)) in
-    PPrint.ToChannel.pretty 0.8 80 params.out_channel (res ^^ hardline)
+    PPrint.ToChannel.pretty 0.8 params.width params.out_channel (res ^^ hardline)
 end
 
 (** Reproduces the original scanned files (or creates new ones in case
