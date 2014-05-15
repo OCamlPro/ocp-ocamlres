@@ -49,13 +49,13 @@ build/ocp-ocamlres.byte: build/ocplib-ocamlres.cma $(BIN_CMO)
 build/ocp-ocamlres.asm: build/ocplib-ocamlres.cmxa $(BIN_CMX)
 	ocamlfind ocamlopt -I build -g -package $(PACKAGES) -linkpkg -o $@ $^
 
-%.cmo %.cmt: %.ml
+build/%.cmo build/%.cmt: build/%.ml
 	ocamlfind ocamlc -I build -g -bin-annot -c -package $(PACKAGES) $<
 
-%.cmi %.cmti: %.mli
+build/%.cmi build/%.cmti: build/%.mli
 	ocamlfind ocamlc -I build -g -bin-annot -c -package $(PACKAGES) $<
 
-%.cmx: %.ml
+build/%.cmx: build/%.ml
 	ocamlfind ocamlopt -I build -g -c -package $(PACKAGES) $<
 
 build/%: src/% | build
