@@ -6,7 +6,7 @@
  * License as published by the Free Software Foundation; either
  * version 3.0 of the License, or (at your option) any later
  * version, with linking exception.
- * 
+ *
  * ocp-ocamlres is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
@@ -14,6 +14,7 @@
  * See the LICENSE file for more details *)
 
 open OCamlResRegistry
+module SM = Map.Make (String)
 
 (** Display help screen with options, formats, subformats and their options *)
 let help args usage =
@@ -133,17 +134,15 @@ let main () =
   let open OCamlRes in
   let open OCamlResScanners in
   let prefilter =
-    PathFilter.(if !exts = [] then any else has_extension !exts)
-  in
+    PathFilter.(if !exts = [] then any else has_extension !exts) in
   let postfilter =
-    ResFilter.(if !skip_empty_dirs then exclude empty_dir else any)
-  in
+    ResFilter.(if !skip_empty_dirs then exclude empty_dir else any) in
   let module F = (val !format) in
   let root =
+    let subformat = OCamlResSubFormats.(module Raw : SubFormat with type t = string) in
     List.fold_left
-      (fun r d -> Res.merge r (scan ~prefilter ~postfilter d))
-      [] !files
-  in
+      (fun r d -> Res.merge r (scan_unix_dir ~prefilter ~postfilter subformat d))
+      [] !files in
   F.output root
 
 let _ = main ()

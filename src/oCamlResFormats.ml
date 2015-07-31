@@ -1,3 +1,5 @@
+(* Formatters for the main resource tree structure *)
+
 (* This file is part of ocp-ocamlres - formats
  * (C) 2013 OCamlPro - Benjamin CANOU
  *
@@ -13,38 +15,25 @@
  *
  * See the LICENSE file for more details *)
 
-(** Formatters for the main resource tree structure *)
-
 open OCamlRes.Path
 open OCamlRes.Res
 open OCamlResSubFormats
 open PPrint
 
-(** Format modules essentially wrap an output function which takes a
-    resource tree as input and produces an output. *)
 module type Format = sig
-
-  (** The type of leaves in the resource tree *)
   type data
-
-  (** Parameters to the output function *)
   type params
-
-  (** Pretty print a resource store to a PPrint document *)
   val output : params -> data root -> unit
 end
 
-(** This format produces OCaml source code with OCaml submodules for
-    directories and OCaml value definitions for files. It is
-    parametric in the type of leaves and the pretty printing
-    function. It is used by the command line tool as instanciated in
-    {!OCamlResRegistry}. *)
+type ocaml_format_params =  {
+  width : int ;
+  out_channel : out_channel
+}
+
 module OCaml (SF : SubFormat) = struct
   type data = SF.t
-  type params = {
-    width : int (** Maximum line width *) ;
-    out_channel : out_channel (** Specify the output *)
-  }
+  type params = ocaml_format_params
 
   let esc name =
     let res = Bytes.of_string name in
@@ -95,16 +84,15 @@ module OCaml (SF : SubFormat) = struct
     PPrint.ToChannel.pretty 0.8 params.width params.out_channel (res ^^ hardline)
 end
 
-(** Produces OCaml source contaiming a single [root] value which
-    contains an OCamlRes tree to be used at runtime through the
-    OCamlRes module. *)
+type res_format_params = {
+  width : int  ;
+  out_channel : out_channel  ;
+  use_variants : bool
+}
+
 module Res (SF : SubFormat) = struct
-  type t = SF.t
-  type params = {
-    width : int (** Maximum line width *) ;
-    out_channel : out_channel (** Specify the output *) ;
-    use_variants : bool (** Produce a sum type or use polymorphic variants *)
-  }
+  type data = SF.t
+  type params = res_format_params
 
   let output params root =
     let hd = ref [] and ft = ref [] in
@@ -161,13 +149,13 @@ module Res (SF : SubFormat) = struct
     PPrint.ToChannel.pretty 0.8 params.width params.out_channel (res ^^ hardline)
 end
 
-(** Reproduces the original scanned files (or creates new ones in case
-    of a forged resource store). *)
+type files_format_params =  {
+  base_output_dir : string ;
+}
+
 module Files (SF : SubFormat) = struct
-  type t = SF.t
-  type params = {
-    base_output_dir : string ;
-  }
+  type data = SF.t
+  type params = files_format_params
 
   let output params root =
     let rec output dirs node =

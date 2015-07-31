@@ -1,3 +1,5 @@
+(* Main entry point of the OCamlRes library. *)
+
 (* This file is part of ocp-ocamlres - main library
  * (C) 2013 OCamlPro - Benjamin CANOU
  *
@@ -6,27 +8,20 @@
  * License as published by the Free Software Foundation; either
  * version 3.0 of the License, or (at your option) any later
  * version, with linking exception.
- * 
+ *
  * ocp-ocamlres is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  *
  * See the LICENSE file for more details *)
- 
-(** Main entry point of the OCamlRes library. *)
 
-(** Paths inside resource stores. *)
 module Path = struct
 
-  (** A path is a list of directory names and optionally a file name
-      which is itself decomposed into a basename and an optional extension. *)
   type t = dirs * name option
   and dirs = string list
   and name = string * ext option
   and ext = string
 
-  (** Splits the part before and after the first dot
-      after the last slash (if any). *)
   let split_ext pstr =
     let len = String.length pstr in
     let rec loop cur last =
@@ -42,7 +37,6 @@ module Path = struct
     in
     loop (len - 1) (len - 1)
 
-  (** Splits the part before and after the last slash (if any). *)
   let split_base pstr =
     let len = String.length pstr in
     let rec loop cur =
@@ -55,7 +49,6 @@ module Path = struct
     in
     loop (len - 1)
 
-  (** Splits a string using slashes as separator. *)
   let split_dirs pstr =
     let len = String.length pstr in
     let rec loop acc cur last =
@@ -69,7 +62,6 @@ module Path = struct
       if pos < 0 then acc else loop acc (pos - 1) (pos - 1)
     in loop [] (len - 1) (len - 1)
 
-  (** Applies ".."s and drops prefix ".."s and "."s. *)
   let shorten (dirs, file) =
     let rec loop acc dirs =
       match acc, dirs with
@@ -80,18 +72,15 @@ module Path = struct
       | _, [] -> List.rev acc
     in loop [] dirs, file
 
-  (** Alias for {!split_ext}. *)
   let name_of_string pstr =
     if String.length pstr = 0 then invalid_arg "OCamlRes.Path.name_of_string" ;
     split_ext pstr
 
-  (** Inverse of {!split_ext}. *)
   let string_of_name (name, ext) =
     match ext with
     | None -> name
     | Some ext -> name ^ "." ^ ext
 
-  (** Turns a Unix-like path string into a {!t}. *)
   let of_string pstr =
     if String.length pstr = 0 then invalid_arg "OCamlRes.Path.of_string" ;
     let dirs, base = split_base pstr in
@@ -102,7 +91,6 @@ module Path = struct
       | Some base -> split_dirs dirs, (Some (split_ext base))
     in shorten path
 
-  (** Turns a {!t} into a Unix-like formatted path string. *)
   let to_string (dirs, file) =
     let open Buffer in
     let buf = create 255 in
@@ -116,24 +104,26 @@ module Path = struct
     Buffer.contents buf
 end
 
-(** Resource store creation and access. *)
 module Res = struct
 
-  (** A resource: a directory of named sub-resources, a file, or an
-      error token (useful to write more resilient treatments). *)
   type 'a node =
     | Dir of string * 'a node list
     | File of string * 'a
     | Error of string
 
-  (** A ressource store (a list of toplevel resources) *)
   type 'a root =
     'a node list
-
   module SM = Map.Make (String)
   module SS = Set.Make (String)
-      
-  (** Merges two resources *)
+
+  let rec map_node f = function
+    | Dir (n, l) -> Dir (n, map f l)
+    | File (n, v) -> File (n, f v)
+    | Error e -> Error e
+
+  and map f l =
+    List.map (map_node f) l
+
   let rec merge_nodes node1 node2 =
     match node1, node2 with
     | Dir (n1, l1), Dir (n2, l2) ->
@@ -155,7 +145,6 @@ module Res = struct
     | (Error _ as e), n | n, (Error _ as e) ->
       [ e ; n ]
 
-  (** Merges two resource stores *)
   and merge (rl : 'a root) (rr : 'a root) : 'a root =
     let files = ref SM.empty in
     let errors = ref SS.empty in
@@ -166,7 +155,7 @@ module Res = struct
              | Dir (n, _) | File (n, _) as f ->
                (try merge_nodes f (SM.find n !files) with Not_found -> [ f ])
              | Error _ as e -> [ e ]
-           in 
+           in
            List.iter
              (function
                | Error msg ->
@@ -180,7 +169,6 @@ module Res = struct
     snd (List.split (SM.bindings !files))
     @ List.map (fun msg -> Error msg) (SS.elements !errors )
 
-  (** Find a resource from its path or raise [Not_found]. *)
   let rec find (path : Path.t) (root : 'a root) : 'a =
     match root, path with
     | File (name, data) :: ns, ([d], None) -> (* let's be flexible *)
@@ -193,7 +181,6 @@ module Res = struct
       find path ps
     | _, _ -> raise Not_found
 
-  (** Find a directory (as a root) from its path or raise [Not_found]. *)
   let rec find_dir (path : Path.t) (root : 'a root) : 'a root =
     match root, path with
     | _, ([], None) -> root
@@ -205,7 +192,6 @@ module Res = struct
     | (Error _ | File _) :: ps, _ ->
       find_dir path ps
 
-  (** Build a new root with an added file. *)
   let rec add (path : Path.t) (data : 'a) (root : 'a root) : 'a root =
     match root, path with
     | [], ([], None) ->
@@ -220,7 +206,7 @@ module Res = struct
       when n = (Path.string_of_name f) ->
       raise (Failure "OCamlRes.Res.add: already exists")
     | Dir (name, ns) as dir :: ps, (d :: ds, f) ->
-      if name = d then 
+      if name = d then
         [ Dir (name, add (ds, f) data ns) ]
       else dir :: add path data ps
     | first :: ps, _ ->

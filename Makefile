@@ -9,14 +9,18 @@ PACKAGES=unix,str,pprint,dynlink
 
 LIB_ML= \
   src/oCamlRes.ml \
-  src/oCamlResScanners.ml \
   src/oCamlResSubFormats.ml \
   src/oCamlResFormats.ml \
+  src/oCamlResScanners.ml \
   src/oCamlResRegistry.ml
 BIN_ML= \
   src/oCamlResMain.ml
 LIB_MLI= \
-  src/oCamlRes.mli
+  src/oCamlRes.mli \
+  src/oCamlResSubFormats.mli \
+  src/oCamlResFormats.mli \
+  src/oCamlResScanners.mli \
+  src/oCamlResRegistry.mli
 
 BIN_CMO = $(patsubst src/%.ml, src/%.cmo, $(BIN_ML))
 BIN_CMX = $(patsubst src/%.ml, src/%.cmx, $(BIN_ML))
@@ -75,7 +79,7 @@ src/ocplib-ocamlres.cmxs: $(LIB_CMX)
 
 -include .depend
 .depend:
-	ocamlfind ocamldep -I src -package $(PACKAGES) $(LIB_ML)  > $@
+	ocamlfind ocamldep -I src -package $(PACKAGES) $(LIB_MLI) $(LIB_ML)  > $@
 
 $(BIN_CMO): src/ocplib-ocamlres.cma
 $(BIN_CMX): src/ocplib-ocamlres.cmxa
