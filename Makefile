@@ -56,13 +56,13 @@ ocp-ocamlres.asm: src/ocplib-ocamlres.cmxa $(BIN_CMX)
 	ocamlfind ocamlopt -I src -g -package $(PACKAGES) -linkpkg -o $@ $^
 
 src/%.cmi src/%.cmti: src/%.mli
-	ocamlfind ocamlc -I src -g -bin-annot -c -package $(PACKAGES) $<
+	ocamlfind ocamlc -safe-string -I src -g -bin-annot -c -package $(PACKAGES) $<
 
 src/%.cmo src/%.cmt src/%.cmi: src/%.ml
-	ocamlfind ocamlc -I src -g -bin-annot -c -package $(PACKAGES) $<
+	ocamlfind ocamlc -safe-string -I src -g -bin-annot -c -package $(PACKAGES) $<
 
 src/%.cmx src/%.cmt src/%.cmi: src/%.ml
-	ocamlfind ocamlopt -I src -g -c -package $(PACKAGES) $<
+	ocamlfind ocamlopt -safe-string -I src -g -c -package $(PACKAGES) $<
 
 src/ocplib-ocamlres.cma: $(LIB_CMO)
 	ocamlfind ocamlc -a -package $(PACKAGES) $^ -o $@
