@@ -1,3 +1,5 @@
+(* Input scanners definition and default implementations. *)
+
 (* This file is part of ocp-ocamlres - input scanners
  * (C) 2013 OCamlPro - Benjamin CANOU
  *
@@ -13,16 +15,10 @@
  *
  * See the LICENSE file for more details *)
 
-(** Input scanners definition and default implementations. *)
-
 open OCamlRes
 
-(** Predicates for filtering paths.
-  * Used to select the files and dirs to be scanned. *)
 module PathFilter = struct
-
   type t = Path.t -> bool
-
   let any : t =
     fun _ -> true
   let none : t =
@@ -51,13 +47,8 @@ module PathFilter = struct
       | _ -> false
 end
 
-(** Predicates for Filtering a resource store.
- * Used after importing resources from the filesystem. More expressive
- * than path filters since they operate on the already parsed tree but
- * cannot prevent the reading of unnecessary files. *)
 module ResFilter = struct
   type 'a t = 'a Res.node -> bool
-
   let any : _ t =
     fun _ -> true
   let none : _ t =
@@ -71,8 +62,11 @@ module ResFilter = struct
   let empty_dir : _ t = function Res.Dir (_, []) -> true | _ -> false
 end
 
-(** Import the files from a base directory as a resource store root. *)
-let scan ?(prefilter = PathFilter.any) ?(postfilter = ResFilter.any) base =
+let scan_unix_dir
+    (type t)
+    ?(prefilter = PathFilter.any)
+    ?(postfilter = ResFilter.any)
+    (module SF : OCamlResSubFormats.SubFormat with type t = t) base =
   let open Res in
   let rec scan path name pstr =
     let res = try
@@ -113,11 +107,10 @@ let scan ?(prefilter = PathFilter.any) ?(postfilter = ResFilter.any) base =
         close_in chan ;
         Bytes.unsafe_to_string buffer
       in
-      File (name, contents)
+      File (name, SF.from_raw (path, Some (Path.split_ext name)) contents)
   in
   match scan [] "root" base with
   | Some (Dir (_, l)) -> l
   | Some (File (_, ctns)) -> [ File (base, ctns) ]
   | Some (Error _ as err) -> [ err ]
   | None -> []
-
