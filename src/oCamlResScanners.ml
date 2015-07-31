@@ -6,13 +6,13 @@
  * License as published by the Free Software Foundation; either
  * version 3.0 of the License, or (at your option) any later
  * version, with linking exception.
- * 
+ *
  * ocp-ocamlres is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  *
  * See the LICENSE file for more details *)
- 
+
 (** Input scanners definition and default implementations. *)
 
 open OCamlRes
@@ -108,10 +108,10 @@ let scan ?(prefilter = PathFilter.any) ?(postfilter = ResFilter.any) base =
       let contents =
         let chan = open_in_bin pstr in
         let len = in_channel_length chan in
-        let buffer = String.create len in
+        let buffer = Bytes.create len in
         really_input chan buffer 0 len ;
         close_in chan ;
-        buffer
+        Bytes.unsafe_to_string buffer
       in
       File (name, contents)
   in
@@ -120,4 +120,4 @@ let scan ?(prefilter = PathFilter.any) ?(postfilter = ResFilter.any) base =
   | Some (File (_, ctns)) -> [ File (base, ctns) ]
   | Some (Error _ as err) -> [ err ]
   | None -> []
-  
+

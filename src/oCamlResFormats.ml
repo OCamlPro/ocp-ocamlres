@@ -6,7 +6,7 @@
  * License as published by the Free Software Foundation; either
  * version 3.0 of the License, or (at your option) any later
  * version, with linking exception.
- * 
+ *
  * ocp-ocamlres is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
@@ -14,7 +14,7 @@
  * See the LICENSE file for more details *)
 
 (** Formatters for the main resource tree structure *)
- 
+
 open OCamlRes.Path
 open OCamlRes.Res
 open OCamlResSubFormats
@@ -47,13 +47,13 @@ module OCaml (SF : SubFormat) = struct
   }
 
   let esc name =
-    let res = String.copy name in
-    for i = 0 to String.length name - 1 do
+    let res = Bytes.of_string name in
+    for i = 0 to Bytes.length res - 1 do
       match name.[i] with
       | '0' .. '9' | '_' | 'a' .. 'z' | 'A'..'Z' -> ()
-      | _ -> res.[i] <- '_'
+      | _ -> Bytes.set res i '_'
     done ;
-    res
+    Bytes.unsafe_to_string res
 
   let esc_name name =
     if name = "" then "void" else

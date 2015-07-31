@@ -154,9 +154,12 @@ module Raw = struct
             loop (acc ^^ chunk last i ^^ !^"\\\\") (i + 1) (i + 1)
           | c, _ when Char.code c >= 128 || Char.code c < 32 ->
             let c = Char.code c in
-            let s = String.create 4 in
-            s.[0] <- '\\' ; s.[1] <- 'x' ;
-            s.[2] <- (hexd.(c lsr 4)) ; s.[3] <- (hexd.(c land 15)) ;
+            let s = Bytes.create 4 in
+            Bytes.set s 0 '\\' ;
+            Bytes.set s 1 'x' ;
+            Bytes.set s 2 (hexd.(c lsr 4)) ;
+            Bytes.set s 3 (hexd.(c land 15)) ;
+            let s = Bytes.unsafe_to_string s in
             loop (acc ^^ chunk last i ^^ !^s) (i + 1) (i + 1)
           | c, _ when i = len - 1 -> acc ^^ chunk last (i + 1)
           | c, _ -> loop acc last (i + 1)
