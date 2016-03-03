@@ -205,7 +205,7 @@ module Res = Tree (struct
 module Variants = Tree (struct
     let variants = true
     let info = "produces the OCaml source representation \
-                of the resource tree using polymorphic variant type \
+                of the resource tree using polymorphic variant type\n\
                 ([ `File of (* depends *) | `Dir of 'a list ] as 'a)"
   end)
 

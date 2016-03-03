@@ -47,23 +47,28 @@ let help args usage =
     let maxw_fs f s = List.fold_left (fun r (_, _, l) -> maxw_args l r) s f in
     2 + maxw_args args (maxw_fs fs (maxw_fs sfs 0))
   in
-  let print_args prfx tw l =
-    List.iter (fun (n, _, m) -> Printf.eprintf "%s%-*s %s\n%!" prfx tw n m) l
+  let print_args tw l =
+    List.iter (fun (n, _, m) -> Format.eprintf "@,%-*s %s" tw n m) l
   in
-  Printf.eprintf "%s\n" usage ;
-  print_args "  " (tw + 2) args ;
-  Printf.eprintf "Available formats:\n" ;
+  Format.eprintf "@[<v 0>%s@,@,Options:@,@[<v 2>" usage ;
+  print_args tw args ;
+  Format.eprintf "@]@,@,@[<v 2>Available formats:" ;
   List.iter
     (fun (n, info, args) ->
-       Printf.eprintf "  * %s: %s\n" n info ;
-       print_args "    " tw args)
+       Format.eprintf "@,@,@[<v 2>@[<v 2>-format %S@,@,@[<hov 0>%a@]@]" n Format.pp_print_text info ;
+       if args <> [] then Format.eprintf "@," ;
+       print_args tw args ;
+       Format.eprintf "@]")
     fs ;
-  Printf.eprintf "Available subformats (for compatible formats):\n" ;
+  Format.eprintf "@]@,@,@[<v 2>Available subformats (for compatible formats):" ;
   List.iter
     (fun (n, info, args) ->
-       Printf.eprintf "  * %s: %s\n" n info ;
-       print_args "    " tw args)
+       Format.eprintf "@,@,@[<v 2>@[<v 2>-subformat %S@,@,@[<hov 0>%a@]@]" n Format.pp_print_text info ;
+       if args <> [] then Format.eprintf "@," ;
+       print_args tw args ;
+       Format.eprintf "@]")
     sfs ;
+  Format.eprintf "@." ;
   exit 0
 
 (** Outputs the list of formats with their descriptions *)
@@ -71,7 +76,7 @@ let list_formats () =
   SM.iter
     (fun n m ->
        let module F = (val m : Format) in
-       Printf.printf "%s: %s\n" n F.info)
+       Format.printf "%s: %a\n" n Format.pp_print_text F.info)
     (formats ()) ;
   exit 0
 
@@ -80,13 +85,13 @@ let list_subformats () =
   SM.iter
     (fun n m ->
        let module SF = (val m : SubFormat) in
-       Printf.printf "%s: %s\n" n SF.info)
+       Format.printf "%s: %a\n" n Format.pp_print_text SF.info)
     (subformats ()) ;
   exit 0
 
 (** Prints the version number *)
 let version () =
-  Printf.printf "0.1\n" ;
+  Format.printf "0.1\n" ;
   exit 0
 
 (** Parse the preload arguments, scan and filter the files, select the
@@ -129,7 +134,7 @@ let main () =
      Arg.parse_argv_dynamic Sys.argv all_args (fun p -> files := p :: !files) usage
    with
    | Arg.Bad opt ->
-     Printf.printf "Unrecognized option %S\n" opt ; help !main_args usage
+     Format.printf "Unrecognized option %S\n" opt ; help !main_args usage
    | Arg.Help _ -> help !main_args usage) ;
   let open OCamlRes in
   let open OCamlResScanners in
