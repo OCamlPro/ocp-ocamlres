@@ -156,40 +156,58 @@ module OCaml = struct
   let output root =
     match !PredefOptions.output_file with
     | None ->
-       let out_channel = stdout in
-       let params = F.({ width = !PredefOptions.width ; out_channel }) in
-       F.output params root
+      let out_channel = stdout in
+      let params = F.({ width = !PredefOptions.width ; out_channel }) in
+      F.output params root
     | Some fn ->
-       let out_channel = open_out fn in
-       let params = F.({ width = !PredefOptions.width ; out_channel }) in
-       output_string out_channel disclaimer ;
-       F.output params root ;
-       close_out out_channel
+      let out_channel = open_out fn in
+      let params = F.({ width = !PredefOptions.width ; out_channel }) in
+      output_string out_channel disclaimer ;
+      F.output params root ;
+      close_out out_channel
 end
 
-module Res = struct
+module Tree (Params : sig val variants : bool val info : string end) = struct
   let use_variants = ref true
   module F = OCamlResFormats.Res (ExtensionDispatcherSubFormat)
   let options =
     PredefOptions.options
     @ [ "-no-variants", Arg.Clear use_variants,
         "use a plain sum type instead of polymorphic variants" ;]
-  let info = "produces the OCaml source representation of the OCamlRes tree"
+  let info = Params.info
   let output root =
-    let use_variants = !use_variants
+    let use_variants_for_leaves = !use_variants
+    and use_variants_for_nodes = Params.variants
     and width = !PredefOptions.width in
     match !PredefOptions.output_file with
     | None ->
-       let out_channel = stdout in
-       let params = F.({ width ; out_channel ; use_variants }) in
-       F.output params root
+      let out_channel = stdout in
+      let params = F.({ width ; out_channel ;
+                        use_variants_for_nodes ;
+                        use_variants_for_leaves }) in
+      F.output params root
     | Some fn ->
-       let out_channel = open_out fn in
-       let params = F.({ width ; out_channel ; use_variants }) in
-       output_string out_channel disclaimer ;
-       F.output params root ;
-       close_out out_channel
+      let out_channel = open_out fn in
+      let params = F.({ width ; out_channel ;
+                        use_variants_for_nodes ;
+                        use_variants_for_leaves }) in
+      output_string out_channel disclaimer ;
+      F.output params root ;
+      close_out out_channel
 end
+
+module Res = Tree (struct
+    let variants = false
+    let info = "produces the OCaml source representation \
+                of the OCamlRes tree"
+  end)
+
+module Variants = Tree (struct
+    let variants = true
+    let info = "produces the OCaml source representation \
+                of the resource tree using polymorphic variant type \
+                ([ `File of (* depends *) | `Dir of 'a list ] as 'a)"
+  end)
 
 module Files = struct
   module F = OCamlResFormats.Files (OCamlResSubFormats.Raw)
@@ -206,4 +224,5 @@ end
 let _ =
   register_format "ocaml" (module OCaml : Format) ;
   register_format "ocamlres" (module Res : Format) ;
+  register_format "variants" (module Variants : Format) ;
   register_format "files" (module Files : Format)

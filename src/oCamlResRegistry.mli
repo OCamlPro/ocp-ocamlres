@@ -137,5 +137,8 @@ module OCaml : Format
 (** Registered under the name ["ocamlres"]. *)
 module Res : Format
 
+(** Registered under the name ["variants"]. *)
+module Variants : Format
+
 (** Registered under the name ["files"]. *)
 module Files : Format

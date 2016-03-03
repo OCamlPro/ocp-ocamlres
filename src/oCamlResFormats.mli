@@ -48,7 +48,12 @@ module OCaml (SF : OCamlResSubFormats.SubFormat) : Format
 type res_format_params = {
   width : int (** Maximum line width *) ;
   out_channel : out_channel (** Specify the output *) ;
-  use_variants : bool (** Produce a sum type or use polymorphic variants *)
+  use_variants_for_leaves : bool ;
+  (** If [true], box resources in variants,
+      if [false], use an ad-hoc sum type *)
+  use_variants_for_nodes : bool ;
+  (** Use variants instead of constructors from ['a OCamlRes.Res.node],
+      to make linking to the [OCamlRes] module optional. *)
 }
 
 (** Produces OCaml source contaiming a single [root] value which
@@ -57,7 +62,6 @@ type res_format_params = {
 module Res (SF : OCamlResSubFormats.SubFormat) : Format
   with type data = SF.t
    and type params = res_format_params
-
 
 (** See {!Files} *)
 type files_format_params =  {
