@@ -87,7 +87,8 @@ end
 type res_format_params = {
   width : int  ;
   out_channel : out_channel  ;
-  use_variants : bool
+  use_variants_for_leaves : bool ;
+  use_variants_for_nodes : bool
 }
 
 module Res (SF : SubFormat) = struct
@@ -109,7 +110,7 @@ module Res (SF : SubFormat) = struct
       match SM.bindings (List.fold_left (collect []) SM.empty root) with
       | [] | [ _ ] -> false
       | l ->
-        if not params.use_variants then begin
+        if not params.use_variants_for_leaves then begin
           let cases =
             separate_map hardline
               (fun (c, t) ->
@@ -118,17 +119,20 @@ module Res (SF : SubFormat) = struct
           hd := [ group (!^"type content =" ^^ nest 2 (hardline ^^ cases)) ]
         end ; true
     in
-    let cstr ext =
-      if not box then ""
-      else (if params.use_variants then "`" else "") ^ String.capitalize ext ^ " "
-    in
+    let res_cstr ext =
+      if not box then !^"" else
+	!^((if params.use_variants_for_leaves then "`" else "")
+           ^ String.capitalize ext ^ " ") in
+    let node_cstr ext =
+      !^((if params.use_variants_for_nodes then "`" else "")
+         ^ String.capitalize ext ^ " ") in
     let rec output dirs node =
       match node with
       | Error msg ->
         !^"(* Error: " ^^ !^ msg ^^ !^ " *)"
       | Dir (d, nodes) ->
         let items = separate_map (!^" ;" ^^ break 1) (output (d :: dirs)) nodes in
-        group (!^"Dir (\"" ^^ !^d ^^ !^"\", ["
+        group (node_cstr "Dir" ^^ !^" (\"" ^^ !^d ^^ !^"\", ["
                ^^ nest 2 (break 1 ^^ items)
                ^^ !^"])")
       | File (name, d) ->
@@ -137,13 +141,16 @@ module Res (SF : SubFormat) = struct
         (match SF.pprint_header p d with None -> () | Some p -> hd := p :: !hd) ;
         (match SF.pprint_footer p d with None -> () | Some p -> ft := p :: !ft) ;
         let cstr_name = SF.name p d in
-        group (!^"File (\"" ^^ !^name ^^ !^"\","
-               ^^ nest 2 (break 1 ^^ !^(cstr cstr_name) ^^ out ^^ !^")"))
+        group (node_cstr "File" ^^ !^" (\"" ^^ !^name ^^ !^"\","
+               ^^ nest 2 (break 1 ^^ res_cstr cstr_name ^^ out ^^ !^")"))
     in
     let items = (separate_map (!^" ;" ^^ break 1) (output []) root) in
     let body =
-      !^"let root = OCamlRes.Res.([" ^^ nest 2 (break 1 ^^ items)
-      ^^ break 1 ^^ !^"])"
+      !^"let root = "
+      ^^ (if params.use_variants_for_nodes then !^"[" else !^"OCamlRes.Res.([")
+      ^^ nest 2 (break 1 ^^ items)
+      ^^ break 1
+      ^^ (if params.use_variants_for_nodes then !^"]" else !^"])")
     in
     let res = separate hardline (List.rev (!ft @ [ body ] @ !hd)) in
     PPrint.ToChannel.pretty 0.8 params.width params.out_channel (res ^^ hardline)
