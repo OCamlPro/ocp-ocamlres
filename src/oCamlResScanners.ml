@@ -66,6 +66,7 @@ let scan_unix_dir
     (type t)
     ?(prefilter = PathFilter.any)
     ?(postfilter = ResFilter.any)
+    ?(prefixed_file = false)
     (module SF : OCamlResSubFormats.SubFormat with type t = t) base =
   let open Res in
   let rec scan path name pstr =
@@ -77,7 +78,15 @@ let scan_unix_dir
             Some (scan_dir path name pstr)
           else None
         else if prefilter (name :: path, Some (Path.split_ext name)) then
-          Some (scan_file path name pstr)
+          match Path.of_string pstr with
+          | _, None -> assert false
+          | prefix, Some name ->
+              let name = Path.string_of_name name in
+              let node = scan_file (path @ prefix) name pstr in
+              if prefixed_file && prefix <> [] then
+                Some (Res.add_prefix ("root" :: prefix) node)
+              else
+                Some node
         else None
       with exn ->
         let msg =
@@ -111,6 +120,6 @@ let scan_unix_dir
   in
   match scan [] "root" base with
   | Some (Dir (_, l)) -> l
-  | Some (File (_, ctns)) -> [ File (base, ctns) ]
+  | Some (File (_, ctns)) -> [ File (Filename.basename base, ctns) ]
   | Some (Error _ as err) -> [ err ]
   | None -> []
