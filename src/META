@@ -1,8 +1,17 @@
-version = "0.1"
+version = "0.4"
 description = "Manipulation, injection and extraction of embedded resources"
 
 archive(byte) = "ocplib-ocamlres.cma"
 archive(byte, plugin) = "ocplib-ocamlres.cma"
 archive(native) = "ocplib-ocamlres.cmxa"
 archive(native, plugin) = "ocplib-ocamlres.cmxs"
+requires = "pprint,str,ocplib-ocamlres.runtime"
 exists_if = "ocplib-ocamlres.cma"
+
+package "runtime" (
+  archive(byte) = "ocplib-ocamlres-runtime.cma"
+  archive(byte, plugin) = "ocplib-ocamlres-runtime.cma"
+  archive(native) = "ocplib-ocamlres-runtime.cmxa"
+  archive(native, plugin) = "ocplib-ocamlres-runtime.cmxs"
+  exists_if = "ocplib-ocamlres-runtime.cma"
+)
