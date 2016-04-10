@@ -89,6 +89,8 @@ let list_subformats () =
     (subformats ()) ;
   exit 0
 
+let prefixed_file = ref false
+
 (** Prints the version number *)
 let version () =
   Format.printf "0.1\n" ;
@@ -127,7 +129,10 @@ let main () =
     "-ext", Arg.String (fun e -> exts := e :: !exts),
     "\"ext\"&only scan files ending with \".ext\" (can be called more than once)" ;
     "-keep-empty-dirs", Arg.Clear skip_empty_dirs,
-    "keep empty dirs in scanned files"
+    "keep empty dirs in scanned files" ;
+    "-keep-path", Arg.Set prefixed_file,
+    "keep the prefix path in the explicitly listed files" ;
+
   ] ;
   set_format "ocamlres" ;
   (try
@@ -142,11 +147,12 @@ let main () =
     PathFilter.(if !exts = [] then any else has_extension !exts) in
   let postfilter =
     ResFilter.(if !skip_empty_dirs then exclude empty_dir else any) in
+  let prefixed_file = !prefixed_file in
   let module F = (val !format) in
   let root =
     let subformat = OCamlResSubFormats.(module Raw : SubFormat with type t = string) in
     List.fold_left
-      (fun r d -> Res.merge r (scan_unix_dir ~prefilter ~postfilter subformat d))
+      (fun r d -> Res.merge r (scan_unix_dir ~prefilter ~postfilter ~prefixed_file subformat d))
       [] !files in
   F.output root
 

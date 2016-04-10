@@ -49,5 +49,6 @@ end
 (** Import the files from a base directory as a resource store root. *)
 val scan_unix_dir :
   ?prefilter: PathFilter.t -> ?postfilter: 'a ResFilter.t ->
+  ?prefixed_file:bool ->
   (module OCamlResSubFormats.SubFormat with type t = 'a) ->
   string -> 'a Res.root

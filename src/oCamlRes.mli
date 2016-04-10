@@ -80,4 +80,8 @@ module Res : sig
 
   (** Transforms the data of a tee, potentially changing their type. *)
   val map : ('a -> 'b) -> 'a root -> 'b root
+
+  (** Add a prefix directory to a node. *)
+  val add_prefix : Path.dirs -> 'a node -> 'a node
+
 end

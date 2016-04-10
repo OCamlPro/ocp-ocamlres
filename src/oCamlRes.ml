@@ -211,4 +211,10 @@ module Res = struct
       else dir :: add path data ps
     | first :: ps, _ ->
       first :: add path data ps
+
+  let rec add_prefix path node =
+    match path with
+    | [] -> node
+    | dir :: path -> Dir (dir, [add_prefix path node])
+
 end
