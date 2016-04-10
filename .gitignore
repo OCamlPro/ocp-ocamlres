@@ -7,3 +7,8 @@
 *.cmx
 *.cmxs
 *.cmxa
+*.cmt
+*.cmti
+ocp-ocamlres.asm
+ocp-ocamlres.byte
+.depend
