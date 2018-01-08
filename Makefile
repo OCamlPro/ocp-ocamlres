@@ -2,7 +2,7 @@ LIBDIR ?= $(shell ocamlfind printconf destdir)
 BINDIR ?= $(LIBDIR)/../bin
 DOCDIR ?= $(LIBDIR)/../doc
 
-PACKAGES=unix,str,pprint,dynlink
+PACKAGES=unix,str,pprint,astring,dynlink
 .PHONY: all clean \
    install uninstall \
    doc install-doc uninstall-doc

@@ -5,7 +5,7 @@ maintainer: "benjamin@ocamlpro.com"
 authors: "benjamin@ocamlpro.com"
 homepage: "https://github.com/OCamlPro/ocp-ocamlres"
 bug-reports: "https://github.com/OCamlPro/ocp-ocamlres/issues"
-depends: ["ocamlfind" "base-unix" "pprint"]
+depends: ["ocamlfind" "base-unix" "pprint" "astring"]
 available: ocaml-version >= "4.01.0"
 build: [
   [make "all"]

@@ -5,7 +5,7 @@ archive(byte) = "ocplib-ocamlres.cma"
 archive(byte, plugin) = "ocplib-ocamlres.cma"
 archive(native) = "ocplib-ocamlres.cmxa"
 archive(native, plugin) = "ocplib-ocamlres.cmxs"
-requires = "pprint,str,ocplib-ocamlres.runtime"
+requires = "pprint,str,ocplib-ocamlres.runtime,astring"
 exists_if = "ocplib-ocamlres.cma"
 
 package "runtime" (

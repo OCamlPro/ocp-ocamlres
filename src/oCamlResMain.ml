@@ -93,7 +93,7 @@ let prefixed_file = ref false
 
 (** Prints the version number *)
 let version () =
-  Format.printf "0.1\n" ;
+  Format.printf "0.4\n" ;
   exit 0
 
 (** Parse the preload arguments, scan and filter the files, select the

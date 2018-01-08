@@ -57,7 +57,7 @@ module OCaml (SF : SubFormat) = struct
       match name.[0] with
       | '0' .. '9' -> "M_" ^ res
       | '_' -> "M" ^ res
-      | 'a'..'z' -> String.capitalize res
+      | 'a'..'z' -> Astring.String.Ascii.capitalize res
       | _ -> res
 
   let output params root =
@@ -114,7 +114,7 @@ module Res (SF : SubFormat) = struct
           let cases =
             separate_map hardline
               (fun (c, t) ->
-                 !^"| " ^^ !^ (String.capitalize c) ^^ !^" of " ^^ !^t) l
+                 !^"| " ^^ !^ (Astring.String.Ascii.capitalize c) ^^ !^" of " ^^ !^t) l
           in
           hd := [ group (!^"type content =" ^^ nest 2 (hardline ^^ cases)) ]
         end ; true
@@ -122,10 +122,10 @@ module Res (SF : SubFormat) = struct
     let res_cstr ext =
       if not box then !^"" else
 	!^((if params.use_variants_for_leaves then "`" else "")
-           ^ String.capitalize ext ^ " ") in
+           ^ Astring.String.Ascii.capitalize ext ^ " ") in
     let node_cstr ext =
       !^((if params.use_variants_for_nodes then "`" else "")
-         ^ String.capitalize ext ^ " ") in
+         ^ Astring.String.Ascii.capitalize ext ^ " ") in
     let rec output dirs node =
       match node with
       | Error msg ->
