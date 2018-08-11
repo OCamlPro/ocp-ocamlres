@@ -107,6 +107,7 @@ $(BIN_CMO): src/ocplib-ocamlres.cma
 $(BIN_CMX): src/ocplib-ocamlres.cmxa
 
 install: all
+	mkdir -p $(LIBDIR) $(BINDIR)
 	ocamlfind install -destdir $(LIBDIR) ocplib-ocamlres \
           src/META \
           src/*ocplib-ocamlres.* \
