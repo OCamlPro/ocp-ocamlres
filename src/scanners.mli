@@ -15,8 +15,6 @@
  *
  * See the LICENSE file for more details *)
 
-open OCamlRes
-
 (** Predicates for filtering paths.
     Used to select the files and dirs to be scanned. *)
 module PathFilter : sig
@@ -36,7 +34,7 @@ end
  * than path filters since they operate on the already parsed tree but
  * cannot prevent the reading of unnecessary files. *)
 module ResFilter : sig
-  type 'a t = 'a Res.node -> bool
+  type 'a t = 'a ResourceStore.node -> bool
 
   val any : 'a t
   val none : 'a t
@@ -50,5 +48,5 @@ end
 val scan_unix_dir :
   ?prefilter: PathFilter.t -> ?postfilter: 'a ResFilter.t ->
   ?prefixed_file:bool ->
-  (module OCamlResSubFormats.SubFormat with type t = 'a) ->
-  string -> 'a Res.root
+  (module SubFormats.SubFormat with type t = 'a) ->
+  string -> 'a ResourceStore.root

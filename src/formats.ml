@@ -15,9 +15,9 @@
  *
  * See the LICENSE file for more details *)
 
-open OCamlRes.Path
-open OCamlRes.Res
-open OCamlResSubFormats
+open Path
+open ResourceStore
+open SubFormats
 open PPrint
 
 module type Format = sig
@@ -147,7 +147,7 @@ module Res (SF : SubFormat) = struct
     let items = (separate_map (!^" ;" ^^ break 1) (output []) root) in
     let body =
       !^"let root = "
-      ^^ (if params.use_variants_for_nodes then !^"[" else !^"OCamlRes.Res.([")
+      ^^ (if params.use_variants_for_nodes then !^"[" else !^"ResourceStore.([")
       ^^ nest 2 (break 1 ^^ items)
       ^^ break 1
       ^^ (if params.use_variants_for_nodes then !^"]" else !^"])")
@@ -171,12 +171,12 @@ module Files (SF : SubFormat) = struct
         Printf.eprintf "Error: %s\n%!" msg
       | Dir (d, nodes) ->
         let p = (List.rev dirs, Some (d, None)) in
-        let fspath = params.base_output_dir ^ OCamlRes.Path.to_string p in
+        let fspath = params.base_output_dir ^ Path.to_string p in
         Unix.handle_unix_error (Unix.mkdir fspath) 0o750 ;
         List.iter (output (d :: dirs)) nodes ;
       | File (name, data) ->
         let p = (List.rev dirs, Some (split_ext name)) in
-        let fspath = params.base_output_dir ^ OCamlRes.Path.to_string p in
+        let fspath = params.base_output_dir ^ Path.to_string p in
         let chan = open_out_bin fspath in
         output_string chan (SF.to_raw p data) ;
         close_out chan

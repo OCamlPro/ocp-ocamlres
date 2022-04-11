@@ -15,8 +15,6 @@
  *
  * See the LICENSE file for more details *)
 
-open OCamlRes
-
 module PathFilter = struct
   type t = Path.t -> bool
   let any : t =
@@ -34,7 +32,7 @@ module PathFilter = struct
       match dirs with
       | [] -> true
       | _ :: tl when lvl > 0 -> loop (pred lvl) tl
-      | _ :: tl -> false
+      | _ :: _tl -> false
     in
     fun path -> loop lvl (fst path)
   let has_extension (exts : string list) : t =
@@ -48,7 +46,7 @@ module PathFilter = struct
 end
 
 module ResFilter = struct
-  type 'a t = 'a Res.node -> bool
+  type 'a t = 'a ResourceStore.node -> bool
   let any : _ t =
     fun _ -> true
   let none : _ t =
@@ -59,7 +57,7 @@ module ResFilter = struct
     fun res -> List.fold_left (fun r f -> r && (f res)) true fs
   let any_of (fs : 'a t list) : 'a t =
     fun res -> List.fold_left (fun r f -> r || (f res)) false fs
-  let empty_dir : _ t = function Res.Dir (_, []) -> true | _ -> false
+  let empty_dir : _ t = function ResourceStore.Dir (_, []) -> true | _ -> false
 end
 
 let scan_unix_dir
@@ -67,8 +65,8 @@ let scan_unix_dir
     ?(prefilter = PathFilter.any)
     ?(postfilter = ResFilter.any)
     ?(prefixed_file = false)
-    (module SF : OCamlResSubFormats.SubFormat with type t = t) base =
-  let open Res in
+    (module SF : SubFormats.SubFormat with type t = t) base =
+  let open ResourceStore in
   let rec scan path name pstr =
     let res = try
         if not (Sys.file_exists pstr) then
@@ -84,7 +82,7 @@ let scan_unix_dir
               let name = Path.string_of_name name in
               let node = scan_file (path @ prefix) name pstr in
               if prefixed_file && prefix <> [] then
-                Some (Res.add_prefix ("root" :: prefix) node)
+                Some (ResourceStore.add_prefix ("root" :: prefix) node)
               else
                 Some node
         else None

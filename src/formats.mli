@@ -26,7 +26,7 @@ module type Format = sig
   type params
 
   (** Pretty print a resource store to a PPrint document *)
-  val output : params -> data OCamlRes.Res.root -> unit
+  val output : params -> data ResourceStore.root -> unit
 end
 
 (** See {!OCaml} *)
@@ -39,8 +39,8 @@ type ocaml_format_params =  {
     directories and OCaml value definitions for files. It is
     parametric in the type of leaves and the pretty printing
     function. It is used by the command line tool as instanciated in
-    {!OCamlResRegistry}. *)
-module OCaml (SF : OCamlResSubFormats.SubFormat) : Format
+    {!Registry}. *)
+module OCaml (SF : SubFormats.SubFormat) : Format
   with type data = SF.t
    and type params = ocaml_format_params
 
@@ -52,14 +52,14 @@ type res_format_params = {
   (** If [true], box resources in variants,
       if [false], use an ad-hoc sum type *)
   use_variants_for_nodes : bool ;
-  (** Use variants instead of constructors from ['a OCamlRes.Res.node],
+  (** Use variants instead of constructors from ['a Res.node],
       to make linking to the [OCamlRes] module optional. *)
 }
 
 (** Produces OCaml source contaiming a single [root] value which
     contains an OCamlRes tree to be used at runtime through the
     OCamlRes module. *)
-module Res (SF : OCamlResSubFormats.SubFormat) : Format
+module Res (SF : SubFormats.SubFormat) : Format
   with type data = SF.t
    and type params = res_format_params
 
@@ -70,6 +70,6 @@ type files_format_params =  {
 
 (** Reproduces the original scanned files (or creates new ones in case
     of a forged resource store). *)
-module Files (SF : OCamlResSubFormats.SubFormat) : Format
+module Files (SF : SubFormats.SubFormat) : Format
   with type data = SF.t
    and type params = files_format_params
