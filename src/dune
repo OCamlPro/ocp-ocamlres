@@ -1,0 +1,11 @@
+(library
+ (name oCamlRes)
+ (public_name ocp-ocamlres)
+ (libraries str unix dynlink pprint astring)
+ (modules (:standard \ main)))
+
+(executable
+ (name main)
+ (public_name ocp-ocamlres)
+ (libraries ocp-ocamlres)
+ (modules main))

@@ -35,12 +35,9 @@
     recompiling it with / dynlinking a module performing a (sub)format
     registration at toplevel) *)
 
-open OCamlResFormats
-open OCamlResSubFormats
-
 (** {2 Formats registry} *)
 
-(** The type of format plug-ins. Differs from {!OCamlResFormats.Format}
+(** The type of format plug-ins. Differs from {!Formats.Format}
     since it is dedicated to be used by the command line tool.  For
     this, the parameters are provided not as a data type but as a list
     of command line args that can mutate global references, which can
@@ -50,9 +47,11 @@ open OCamlResSubFormats
     to strings representing the raw encoding of data. *)
 module type Format = sig
   (** Leaves are raw data strings *)
-  val output : string OCamlRes.Res.root -> unit
+  val output : string ResourceStore.root -> unit
+
   (** A short dexcription for the help page *)
   val info : string
+  
   (** The list of specific arguments, that are parsed before any call to {!output} *)
   val options : (Arg.key * Arg.spec * Arg.doc) list
 end
@@ -71,10 +70,11 @@ val formats : unit -> (module Format) Map.Make (String).t
 
 (** The type of subformat plug-ins *)
 module type SubFormat = sig
-  (** Leaves are raw data strings *)
-  include OCamlResSubFormats.SubFormat
+  include SubFormats.SubFormat
+
   (** A short dexcription for the help page *)
   val info : string
+
   (** The list of specific arguments *)
   val options : (Arg.key * Arg.spec * Arg.doc) list
 end
@@ -126,7 +126,7 @@ end
     and the [from_raw] method of the selected subformat is used at
     every operation. The [SubFormat] used is resolved using table
     {!PredefOptions.subformats}. *)
-module ExtensionDispatcherSubFormat : OCamlResSubFormats.SubFormat with type t = string
+module ExtensionDispatcherSubFormat : SubFormats.SubFormat with type t = string
 
 (** Disclaimer that you can use in your own formats *)
 val disclaimer : string

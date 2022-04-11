@@ -19,14 +19,14 @@
 module type SubFormat = sig
   type t
 
-  val from_raw : OCamlRes.Path.t -> string -> t
-  val to_raw : OCamlRes.Path.t -> t -> string
-  val pprint : OCamlRes.Path.t -> t -> PPrint.document
-  val pprint_header : OCamlRes.Path.t -> t -> PPrint.document option
-  val pprint_footer : OCamlRes.Path.t -> t -> PPrint.document option
-  val name : OCamlRes.Path.t -> t -> string
-  val type_name : OCamlRes.Path.t -> t -> string
-  val mod_name : OCamlRes.Path.t -> t -> string
+  val from_raw : Path.t -> string -> t
+  val to_raw : Path.t -> t -> string
+  val pprint : Path.t -> t -> PPrint.document
+  val pprint_header : Path.t -> t -> PPrint.document option
+  val pprint_footer : Path.t -> t -> PPrint.document option
+  val name : Path.t -> t -> string
+  val type_name : Path.t -> t -> string
+  val mod_name : Path.t -> t -> string
 end
 
 module Int = struct
@@ -48,7 +48,7 @@ module Raw = struct
   let from_raw _ raw_text = raw_text
   let to_raw _ raw_text = raw_text
 
-  let pprint path data =
+  let pprint _path data =
     let open PPrint in
     let len = String.length data in
     let looks_like_text =
@@ -116,8 +116,8 @@ module Raw = struct
             Bytes.set s 3 (hexd.(c land 15)) ;
             let s = Bytes.unsafe_to_string s in
             loop (acc ^^ chunk last i ^^ !^s) (i + 1) (i + 1)
-          | c, _ when i = len - 1 -> acc ^^ chunk last (i + 1)
-          | c, _ -> loop acc last (i + 1)
+          | _c, _ when i = len - 1 -> acc ^^ chunk last (i + 1)
+          | _c, _ -> loop acc last (i + 1)
       in
       group (align (!^"\"" ^^ loop empty 0 0 ^^ !^"\""))
   let pprint_header _ _ = None

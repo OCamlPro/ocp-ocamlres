@@ -13,12 +13,12 @@
  *
  * See the LICENSE file for more details *)
 
-open OCamlResRegistry
+open OCamlRes.Registry
 module SM = Map.Make (String)
 
 (** Display help screen with options, formats, subformats and their options *)
 let help args usage =
-  let arg_parts (n, t, msg) =
+  let arg_parts (n, _t, msg) =
     try
       let i = String.index msg '&' in
       let n = n ^ " " ^ String.sub msg 0 i in
@@ -141,8 +141,7 @@ let main () =
    | Arg.Bad opt ->
      Format.printf "Unrecognized option %S\n" opt ; help !main_args usage
    | Arg.Help _ -> help !main_args usage) ;
-  let open OCamlRes in
-  let open OCamlResScanners in
+  let open OCamlRes.Scanners in
   let prefilter =
     PathFilter.(if !exts = [] then any else has_extension !exts) in
   let postfilter =
@@ -150,9 +149,9 @@ let main () =
   let prefixed_file = !prefixed_file in
   let module F = (val !format) in
   let root =
-    let subformat = OCamlResSubFormats.(module Raw : SubFormat with type t = string) in
+    let subformat = OCamlRes.SubFormats.(module Raw : SubFormat with type t = string) in
     List.fold_left
-      (fun r d -> Res.merge r (scan_unix_dir ~prefilter ~postfilter ~prefixed_file subformat d))
+      (fun r d -> OCamlRes.ResourceStore.merge r (scan_unix_dir ~prefilter ~postfilter ~prefixed_file subformat d))
       [] !files in
   F.output root
 
